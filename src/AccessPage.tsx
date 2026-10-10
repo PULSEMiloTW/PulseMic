@@ -5,6 +5,9 @@ export function AccessPage() {
   const caster = location.pathname === "/caster-output";
   const output = location.pathname === "/output" || caster;
   const [token, setToken] = useState("");
+  const [requester, setRequester] = useState("");
+  const [requestNotice, setRequestNotice] = useState("");
+  const [requestBusy, setRequestBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(() => {
@@ -49,6 +52,33 @@ export function AccessPage() {
       setBusy(false);
     }
   }
+  async function requestCode() {
+    if (requestBusy) return;
+    setRequestBusy(true);
+    setError("");
+    setRequestNotice("");
+    try {
+      const response = await fetch("/auth/output-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requester,
+          kind: caster ? "caster" : "players",
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "要求失敗，請重試。");
+      setRequestNotice(
+        `要求編號 ${body.requestId}：授權碼已顯示於主機 CMD，請向主機操作員取得。`,
+      );
+    } catch (failure) {
+      setError(
+        failure instanceof Error ? failure.message : "服務暫時無法連線。",
+      );
+    } finally {
+      setRequestBusy(false);
+    }
+  }
   if (token)
     return (
       <App outputToken={token} outputKind={caster ? "caster" : "players"} />
@@ -71,6 +101,22 @@ export function AccessPage() {
       </p>
       {output ? (
         <form onSubmit={(event) => void redeem(event)}>
+          <label htmlFor="requester-name">要求者名稱</label>
+          <input
+            id="requester-name"
+            value={requester}
+            maxLength={80}
+            autoComplete="name"
+            onChange={(event) => setRequester(event.target.value)}
+          />
+          <button
+            type="button"
+            disabled={requestBusy || busy || !requester.trim()}
+            onClick={() => void requestCode()}
+          >
+            {requestBusy ? "要求中…" : "獲取授權碼"}
+          </button>
+          {requestNotice ? <p role="status">{requestNotice}</p> : null}
           <label htmlFor="access-code">一次性授權碼</label>
           <input
             id="access-code"

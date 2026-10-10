@@ -266,3 +266,34 @@ test("public output grant permits only output socket, never controller APIs", as
     });
   });
 });
+
+test("output requests deliver only a reference to the browser and reject unsafe origins", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/output");
+  await page.getByLabel("要求者名稱").fill("輸出測試操作員");
+  const responsePromise = page.waitForResponse("**/auth/output-request");
+  await page.getByRole("button", { name: "獲取授權碼", exact: true }).click();
+  const response = await responsePromise;
+  expect(response.status()).toBe(202);
+  expect(Object.keys(await response.json())).toEqual(["requestId"]);
+  await expect(page.getByRole("status")).toContainText("主機 CMD");
+  const data = { kind: "caster", requester: "test" };
+  expect(
+    (
+      await request.post("/auth/output-request", {
+        headers: { Origin: "https://evil.example" },
+        data,
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await request.post("/auth/output-request", {
+        headers: { Origin: "http://localhost:3211" },
+        data,
+      })
+    ).status(),
+  ).toBe(429);
+});

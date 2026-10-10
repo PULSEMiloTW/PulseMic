@@ -134,6 +134,47 @@ app.get("/api/access", (_, res) => {
     ),
   });
 });
+const outputRequests = new Map<string, number>();
+app.post("/auth/output-request", rateLimit, (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!originAllowed(req.headers.origin, req.headers.host))
+    return void res.status(403).end();
+  const parsed = z
+    .object({
+      kind: z.enum(["players", "caster"]),
+      requester: z.string().trim().min(1).max(80),
+    })
+    .safeParse(req.body);
+  if (!parsed.success)
+    return void res.status(400).json({ error: "請填寫要求者名稱。" });
+  const ip =
+    req.headers.host === publicHost
+      ? String(req.headers["cf-connecting-ip"] ?? "unknown")
+      : (req.socket.remoteAddress ?? "local");
+  const now = Date.now();
+  for (const [key, expires] of outputRequests)
+    if (expires <= now) outputRequests.delete(key);
+  if (outputRequests.has(ip) || outputRequests.size >= 50)
+    return void res.status(429).json({ error: "請稍候一分鐘再要求授權碼。" });
+  outputRequests.set(ip, now + 60_000);
+  try {
+    const { code, expires } = access.issueCode(parsed.data.kind);
+    const requestId = randomBytes(4).toString("hex").toUpperCase();
+    // Explicit operator terminal delivery; never include Bot tokens or session secrets.
+    const safe = (value: string) =>
+      value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 250);
+    console.log(`\n[輸出授權要求 ${requestId}] ${new Date(now).toISOString()}
+輸出：${parsed.data.kind === "caster" ? "主播台" : "選手 A/B"}
+要求者（自行填寫，未驗證）：${safe(parsed.data.requester)}
+連線 IP：${safe(ip)}
+瀏覽器：${safe(String(req.headers["user-agent"] ?? "未知"))}
+一次性授權碼：${code}
+有效至：${new Date(expires).toISOString()}（僅可使用一次）\n`);
+    res.status(202).json({ requestId });
+  } catch {
+    res.status(503).json({ error: "目前待用授權碼過多，請稍後重試。" });
+  }
+});
 app.post("/auth/output", rateLimit, (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!originAllowed(req.headers.origin, req.headers.host))
