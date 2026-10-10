@@ -20,8 +20,7 @@ export function OutputAccess({
   return (
     <section className="output-access" aria-label={`${name}輸出授權`}>
       <div>
-        <h2>{name} · 獨立輸出</h2>
-        <p>專用授權碼，單次使用。重新整理需取新碼；控制台持續在線。</p>
+        <h2>{kind === "caster" ? "主播台輸出" : "選手輸出"}</h2>
       </div>
       <div className="output-actions">
         <a
@@ -44,7 +43,7 @@ export function OutputAccess({
               .finally(() => setBusy(false));
           }}
         >
-          {busy ? "產生中…" : "產生一次性授權碼"}
+          {busy ? "產生中…" : "產生授權碼"}
         </button>
       </div>
       {grant ? (

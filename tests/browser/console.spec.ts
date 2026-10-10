@@ -11,11 +11,10 @@ test("desktop console: explicit demo, independent source choices, duplicate hand
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/?tab=control");
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "連線設定", exact: true }).click();
   await page.getByRole("button", { name: "進入示範模式" }).click();
-  await expect(
-    page.getByText("虛構伺服器與成員；測試音由本機產生，未連接 Discord。"),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "收聽", exact: true }).click();
+  await expect(page.locator(".lane-a .demo-tag")).toHaveText("示範音源");
+  await page.getByRole("link", { name: "音控台", exact: true }).click();
   const laneA = page.locator(".lane-a").first();
   const laneB = page.locator(".lane-b").first();
   await laneA.getByRole("button", { name: "Channel B 琥珀隊選手語音" }).click();
@@ -144,10 +143,10 @@ test("narrow console has stacked lanes, keyboard focus and no horizontal overflo
     fullPage: true,
   });
   await page.keyboard.press("Tab");
-  await page.getByRole("link", { name: "收聽", exact: true }).focus();
+  await page.getByRole("link", { name: "音控台", exact: true }).focus();
   expect(
     await page
-      .getByRole("link", { name: "收聽", exact: true })
+      .getByRole("link", { name: "音控台", exact: true })
       .evaluate((element) => getComputedStyle(element).outlineStyle),
   ).toBe("solid");
   await page.getByRole("button", { name: "全部靜音", exact: true }).click();
@@ -238,8 +237,8 @@ test("settings stays local, has empty tokens and actual resolved names; no publi
   await page
     .getByLabel("伺服器 ID", { exact: true })
     .fill("123456789012345678");
-  await page.getByRole("link", { name: "收聽", exact: true }).click();
-  await page.getByRole("link", { name: "設定", exact: true }).click();
+  await page.getByRole("link", { name: "音控台", exact: true }).click();
+  await page.getByRole("link", { name: "連線設定", exact: true }).click();
   await expect(page.getByLabel("伺服器 ID", { exact: true })).toHaveValue(
     "123456789012345678",
   );

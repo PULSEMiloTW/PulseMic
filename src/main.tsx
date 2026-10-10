@@ -5,6 +5,7 @@ import "@fontsource/noto-sans-tc/600.css";
 import "@fontsource/barlow/500.css";
 import "@fontsource/barlow/700.css";
 import "./style.css";
+import "./desk.css";
 import { App } from "./App";
 import { AccessPage } from "./AccessPage";
 const gated =

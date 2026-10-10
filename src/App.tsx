@@ -1,4 +1,11 @@
-import { memo, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   ids,
   laneStatus,
@@ -198,6 +205,7 @@ function LanePanel({
   updateMember,
   readOnly = false,
   caster = false,
+  footer,
 }: {
   state: Snapshot;
   id: LaneId;
@@ -213,6 +221,7 @@ function LanePanel({
   updateMember: (id: string, value: MemberMix) => void;
   readOnly?: boolean;
   caster?: boolean;
+  footer?: ReactNode;
 }) {
   const lane = state.lanes[id];
   const busy =
@@ -248,6 +257,9 @@ function LanePanel({
           {laneStatus(lane)}
         </span>
       </div>
+      {state.mode === "demo" ? (
+        <span className="demo-tag">示範音源</span>
+      ) : null}
       <div className="lane-meta">
         <span>
           {lane.botName}{" "}
@@ -283,7 +295,7 @@ function LanePanel({
         ) : (
           <>
             <Icon name="signal" />
-            {lane.error ?? "派遣機器人後，這裡會顯示實際成員"}
+            {lane.error ?? "尚未開啟語音"}
           </>
         )}
       </div>
@@ -299,14 +311,22 @@ function LanePanel({
           {busy
             ? "處理中…"
             : lane.status === "listening"
-              ? "關閉語音"
+              ? caster
+                ? "關閉主播台語音"
+                : "關閉語音"
               : lane.status === "error"
-                ? "重試連線"
-                : "開啟語音"}
+                ? caster
+                  ? "重試主播台連線"
+                  : "重試連線"
+                : caster
+                  ? "開啟主播台語音"
+                  : "開啟語音"}
         </button>
-        <span>派遣來源</span>
+        {caster ? (
+          <span title={state.sources.A.name}>{state.sources.A.name}</span>
+        ) : null}
       </div>
-      {!readOnly ? (
+      {!readOnly && !caster ? (
         <SourceButtons
           state={state}
           lane={lane}
@@ -341,11 +361,6 @@ function LanePanel({
               ? "頻道目前沒有可監聽成員"
               : "等待語音派遣"}
           </strong>
-          <p>
-            {lane.status === "listening"
-              ? "成員加入後會自動出現在這裡。"
-              : "選擇目標頻道，或按開啟語音加入上次來源。"}
-          </p>
         </div>
       )}
       <div className="lane-mix">
@@ -395,54 +410,30 @@ function LanePanel({
           </button>
         </div>
       </div>
+      {footer}
     </section>
   );
 }
-function CasterDesk({
+function CasterSettings({
   state,
   connected,
-  remoteMix,
   request,
-  localHost,
 }: {
   state?: Snapshot;
   connected: boolean;
-  remoteMix?: Mix;
-  localHost: boolean;
-  request: (
-    path: string,
-    body: unknown,
-  ) => Promise<{ code: string; expires: number }>;
+  request: (path: string, body: unknown) => Promise<unknown>;
 }) {
-  const [audio] = useState(() => new HeadphoneMixer());
-  const [mix, setMix] = useState(() => readMix("pulsemic.caster.mix.v1"));
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const dirty = useRef(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (remoteMix) setMix(remoteMix);
-  }, [remoteMix]);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem("pulsemic.caster.mix.v1", JSON.stringify(mix));
-      } catch {
-        setError("無法保存主播台音量偏好。");
-      }
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [mix]);
-  useEffect(() => {
     const prevent = (event: BeforeUnloadEvent) => {
       if (dirty.current) event.preventDefault();
     };
     window.addEventListener("beforeunload", prevent);
-    return () => {
-      window.removeEventListener("beforeunload", prevent);
-      void audio.stop();
-    };
-  }, [audio]);
+    return () => window.removeEventListener("beforeunload", prevent);
+  }, []);
   async function run(path: string, body: unknown) {
     if (lock.current) return false;
     lock.current = true;
@@ -461,190 +452,200 @@ function CasterDesk({
       setBusy(false);
     }
   }
-  function updateMix(next: Mix) {
-    setMix(next);
-    void request("/api/caster/mix", next).catch(() =>
-      setError("主播台音量未同步，請確認控制連線後再調整。"),
-    );
-  }
-  if (!state) return <p role="status">正在取得主播台狀態…</p>;
+  if (!state) return <p role="status">正在取得主播台設定…</p>;
   const lane = state.lanes.A;
   const pending =
     busy ||
     !connected ||
     ["connecting", "disconnecting", "reconnecting"].includes(lane.status);
   return (
-    <div className="caster-desk">
+    <section className="caster-settings">
+      <h2>主播台來源設定</h2>
       {error ? (
-        <p className="error-banner" role="alert">
+        <p className="form-error" role="alert">
           {error}
         </p>
       ) : null}
-      {state.mode === "demo" ? (
-        <p className="demo-banner">
-          <strong>主播台示範模式</strong>虛構成員，未連接 Discord。
-        </p>
-      ) : null}
-      <div className="caster-layout">
-        <div className="caster-mixer">
-          <div className="caster-dispatch">
-            <div>
-              <strong>{state.guildName ?? "尚未設定主播台"}</strong>
-            </div>
-            <button
-              className="primary"
-              disabled={pending || !state.validated}
-              onClick={() =>
-                void run("/api/caster/bot", {
-                  action: lane.status === "listening" ? "close" : "open",
-                })
-              }
-            >
-              {pending
-                ? "處理中…"
-                : lane.status === "listening"
-                  ? "關閉主播台語音"
-                  : lane.status === "error"
-                    ? "重試主播台連線"
-                    : "開啟主播台語音"}
-            </button>
-          </div>
-          <LanePanel
-            caster
-            readOnly
-            state={state}
-            id="A"
-            mix={mix}
-            audio={audio}
-            pending={pending}
-            command={() => {}}
-            updateMix={updateMix}
-            updateMember={(id, value) =>
-              updateMix({ ...mix, members: { ...mix.members, [id]: value } })
+      <form
+        onChange={() => {
+          dirty.current = true;
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const data = new FormData(form);
+          void run("/api/caster/settings", {
+            guildId: data.get("guildId"),
+            channelId: data.get("channelId"),
+            token: data.get("token"),
+          }).then((ok) => {
+            if (ok) {
+              dirty.current = false;
+              (form.elements.namedItem("token") as HTMLInputElement).value = "";
             }
-          />
-          <div className="caster-master">
-            <strong>主播台輸出總音量</strong>
-            <Volume
-              max={100}
-              label="主播台輸出總音量"
-              value={mix.master}
-              onChange={(master) => updateMix({ ...mix, master })}
-            />
-          </div>
-          <p className="mix-note" role="status">
-            {state.notice}
-          </p>
+          });
+        }}
+      >
+        <label htmlFor="caster-guild">主播台伺服器 ID</label>
+        <input
+          id="caster-guild"
+          name="guildId"
+          defaultValue={state.settings.guildId}
+          required
+          pattern="[0-9]{17,20}"
+          inputMode="numeric"
+          autoComplete="off"
+        />
+        <label htmlFor="caster-channel">主播台語音頻道 ID</label>
+        <input
+          id="caster-channel"
+          name="channelId"
+          defaultValue={state.settings.channels.A}
+          required
+          pattern="[0-9]{17,20}"
+          inputMode="numeric"
+          autoComplete="off"
+        />
+        <label htmlFor="caster-token">Caster Desk Bot Token</label>
+        <input
+          id="caster-token"
+          name="token"
+          type="password"
+          maxLength={256}
+          autoComplete="off"
+          required={!state.settings.tokensSaved.A}
+          placeholder={
+            state.settings.tokensSaved.A
+              ? "已加密保存；留空沿用"
+              : "僅在本機輸入"
+          }
+        />
+        <button disabled={pending || lane.status === "listening"}>
+          {busy ? "驗證中…" : "保存並驗證主播台"}
+        </button>
+      </form>
+
+      {state.validated ? (
+        <div className="caster-verified">
+          <strong>{state.guildName}</strong>
+          <span>{state.sources.A.name}</span>
         </div>
-        <aside className="caster-sidebar" aria-label="主播台輸出與設定">
-          <OutputAccess kind="caster" connected={connected} request={request} />
-          <section className="caster-settings">
-            <h2>主播台來源設定</h2>
-            <p>
-              第三個獨立 Bot；不占用選手 A/B。設定變更前請先退出主播台語音。
-            </p>
-            {localHost ? (
-              <form
-                onChange={() => {
-                  dirty.current = true;
-                }}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  const data = new FormData(form);
-                  void run("/api/caster/settings", {
-                    guildId: data.get("guildId"),
-                    channelId: data.get("channelId"),
-                    token: data.get("token"),
-                  }).then((ok) => {
-                    if (ok) {
-                      dirty.current = false;
-                      (
-                        form.elements.namedItem("token") as HTMLInputElement
-                      ).value = "";
-                    }
-                  });
-                }}
-              >
-                <label htmlFor="caster-guild">主播台伺服器 ID</label>
-                <input
-                  id="caster-guild"
-                  name="guildId"
-                  defaultValue={state.settings.guildId}
-                  required
-                  pattern="[0-9]{17,20}"
-                  inputMode="numeric"
-                  autoComplete="off"
-                />
-                <label htmlFor="caster-channel">主播台語音頻道 ID</label>
-                <input
-                  id="caster-channel"
-                  name="channelId"
-                  defaultValue={state.settings.channels.A}
-                  required
-                  pattern="[0-9]{17,20}"
-                  inputMode="numeric"
-                  autoComplete="off"
-                />
-                <label htmlFor="caster-token">Caster Desk Bot Token</label>
-                <input
-                  id="caster-token"
-                  name="token"
-                  type="password"
-                  maxLength={256}
-                  autoComplete="off"
-                  required={!state.settings.tokensSaved.A}
-                  placeholder={
-                    state.settings.tokensSaved.A
-                      ? "已加密保存；留空沿用"
-                      : "僅在本機輸入"
-                  }
-                />
-                <button disabled={pending || lane.status === "listening"}>
-                  {busy ? "驗證中…" : "保存並驗證主播台"}
-                </button>
-              </form>
-            ) : (
-              <p>
-                請在執行 PulseMic 的 Windows 電腦開啟本機控制台，輸入主播台 ID
-                與 Token。
-              </p>
-            )}
-            {state.validated ? (
-              <div className="caster-verified">
-                <strong>{state.guildName}</strong>
-                <span>{state.sources.A.name}</span>
-                <small>
-                  來源已驗證 ·{" "}
-                  {state.mode === "demo" ? "示範資料" : "Discord 真實頻道"}
-                </small>
-              </div>
-            ) : null}
-            <div className="caster-mode">
-              <button
-                disabled={pending}
-                onClick={() =>
-                  void run("/api/caster/mode", {
-                    mode: state.mode === "demo" ? "live" : "demo",
-                  })
-                }
-              >
-                {state.mode === "demo"
-                  ? "回到主播台真實模式"
-                  : "演練主播台介面"}
-              </button>
-              {state.mode === "live" && state.settings.tokensSaved.A ? (
-                <button
-                  disabled={pending || lane.status === "listening"}
-                  onClick={() => void run("/api/caster/validate", {})}
-                >
-                  重新驗證主播台
-                </button>
-              ) : null}
-            </div>
-          </section>
-        </aside>
+      ) : null}
+      <div className="caster-mode">
+        <button
+          disabled={pending}
+          onClick={() =>
+            void run("/api/caster/mode", {
+              mode: state.mode === "demo" ? "live" : "demo",
+            })
+          }
+        >
+          {state.mode === "demo" ? "回到主播台真實模式" : "演練主播台介面"}
+        </button>
+        {state.mode === "live" && state.settings.tokensSaved.A ? (
+          <button
+            disabled={pending || lane.status === "listening"}
+            onClick={() => void run("/api/caster/validate", {})}
+          >
+            重新驗證主播台
+          </button>
+        ) : null}
       </div>
+    </section>
+  );
+}
+function CasterDesk({
+  state,
+  connected,
+  remoteMix,
+  request,
+}: {
+  state?: Snapshot;
+  connected: boolean;
+  remoteMix?: Mix;
+  request: (path: string, body: unknown) => Promise<unknown>;
+}) {
+  const [audio] = useState(() => new HeadphoneMixer());
+  const [mix, setMix] = useState(() => readMix("pulsemic.caster.mix.v1"));
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (remoteMix) setMix(remoteMix);
+  }, [remoteMix]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem("pulsemic.caster.mix.v1", JSON.stringify(mix));
+      } catch {
+        setError("無法保存主播台音量偏好。");
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [mix]);
+  useEffect(
+    () => () => {
+      void audio.stop();
+    },
+    [audio],
+  );
+  function updateMix(next: Mix) {
+    setMix(next);
+    void request("/api/caster/mix", next).catch(() =>
+      setError("主播台音量未同步，請重試。"),
+    );
+  }
+  async function command(_: LaneId, action: "open" | "close" | "switch") {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await request("/api/caster/bot", { action });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "主播台操作失敗。");
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
+  if (!state) return <p role="status">正在取得主播台狀態…</p>;
+  return (
+    <div className="caster-desk caster-mixer">
+      <LanePanel
+        caster
+        state={state}
+        id="A"
+        mix={mix}
+        audio={audio}
+        pending={busy || !connected}
+        command={(id, action) => void command(id, action)}
+        updateMix={updateMix}
+        updateMember={(id, value) =>
+          updateMix({ ...mix, members: { ...mix.members, [id]: value } })
+        }
+        footer={
+          <>
+            {error ? (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="caster-master">
+              <strong>主播台輸出總音量</strong>
+              <Volume
+                max={100}
+                label="主播台輸出總音量"
+                value={mix.master}
+                onChange={(master) => updateMix({ ...mix, master })}
+              />
+            </div>
+            <span className="sr-only" role="status">
+              {state.notice}
+            </span>
+          </>
+        }
+      />
     </div>
   );
 }
@@ -702,8 +703,7 @@ function Settings({
   return (
     <div className="settings-layout">
       <section className="settings-panel">
-        <h2>Discord 連線設定</h2>
-        <p>設定兩個獨立 Bot，以及共同可選的兩個語音來源。</p>
+        <h2>選手來源設定</h2>
         <form
           ref={form}
           onSubmit={(event) => {
@@ -745,11 +745,6 @@ function Settings({
             {ids.map((id) => (
               <label key={id}>
                 機器人 {id} Token
-                <span className="field-help">
-                  {state.settings.tokensSaved[id]
-                    ? "已加密保存；留白沿用本機憑證"
-                    : "尚未設定；移轉電腦後需重新輸入"}
-                </span>
                 <input
                   type="password"
                   name={`token${id}`}
@@ -757,15 +752,15 @@ function Settings({
                   spellCheck={false}
                   required={!state.settings.tokensSaved[id]}
                   maxLength={256}
-                  placeholder="輸入 Bot Token…"
+                  placeholder={
+                    state.settings.tokensSaved[id]
+                      ? "已保存；留空沿用"
+                      : "輸入 Bot Token"
+                  }
                 />
               </label>
             ))}
           </div>
-          <p className="privacy">
-            Token 只傳至本機後端，使用目前 Windows 使用者加密保存；後端不回傳
-            Token。
-          </p>
           {formError ? (
             <p className="form-error" role="alert">
               {formError}
@@ -789,45 +784,25 @@ function Settings({
               重新驗證本機設定
             </button>
           </div>
-          {dirty ? (
-            <p className="field-help">
-              有尚未保存的變更。切換分頁仍會保留輸入。
-            </p>
-          ) : null}
+          {dirty ? <p className="field-help">尚未保存</p> : null}
         </form>
       </section>
-      <aside className="setup-info">
-        <img
-          src="/brand/PulseMic_Icon.png"
-          width="100"
-          height="100"
-          alt="PulseMic 圖示"
-        />
-        <h2>把語音帶進導播席</h2>
-        <ol>
-          <li>建立兩個 Discord Application，取得不同 Bot 的 Token。</li>
-          <li>邀請兩隻 Bot 到相同伺服器，授予「查看頻道」與「連接」權限。</li>
-          <li>開啟 Discord 開發者模式，複製伺服器及一般語音頻道 ID。</li>
-          <li>驗證成功後到收聽分頁派遣，再點擊「開始監聽」。</li>
-        </ol>
-        <p>不需要麥克風權限。停止耳機監聽不會讓 Bot 退出。</p>
-        <div className="verified">
-          <strong>
-            {state.mode === "demo"
-              ? "示範資料 · 未驗證真實 Discord"
-              : state.validated
-                ? "Discord 設定已驗證"
-                : "等待真實設定驗證"}
-          </strong>
-          <p>{state.guildName ?? "尚未取得伺服器名稱"}</p>
-          {ids.map((id) => (
-            <p key={id}>
-              Channel {id}
-              <b>{state.sources[id].name || "尚未取得實際頻道名稱"}</b>
-            </p>
-          ))}
-        </div>
-      </aside>
+      <div className="verified">
+        <strong>
+          {state.mode === "demo"
+            ? "示範資料 · 未驗證真實 Discord"
+            : state.validated
+              ? "Discord 設定已驗證"
+              : "等待真實設定驗證"}
+        </strong>
+        <p>{state.guildName ?? "尚未取得伺服器名稱"}</p>
+        {ids.map((id) => (
+          <p key={id}>
+            Channel {id}
+            <b>{state.sources[id].name || "尚未取得實際頻道名稱"}</b>
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
@@ -852,7 +827,19 @@ export function App({
     audio.updateMix(control.remoteMix);
     setMix(control.remoteMix);
   }, [audio, output, control.remoteMix]);
-  const [tab, setTab] = useState<Tab>(readTab);
+  const [settingsOpen, setSettingsOpen] = useState(
+    () =>
+      ["settings", "caster"].includes(readTab()) ||
+      window.location.hash === "#settings",
+  );
+  const [recentNotice, setRecentNotice] = useState("等待本機服務連線");
+  useEffect(() => {
+    if (state?.notice) setRecentNotice(state.notice);
+  }, [state?.notice]);
+  useEffect(() => {
+    if (control.casterState?.notice)
+      setRecentNotice(control.casterState.notice);
+  }, [control.casterState?.notice]);
   const [monitoring, setMonitoring] = useState(false);
   const [audioStatus, setAudioStatus] = useState("耳機監聽尚未啟用");
   const [tone, setTone] = useState(false);
@@ -875,11 +862,6 @@ export function App({
     }, 200);
     return () => clearTimeout(timer);
   }, [audio, mix, setError, mixKey]);
-  useEffect(() => {
-    const listener = () => setTab(readTab());
-    window.addEventListener("popstate", listener);
-    return () => window.removeEventListener("popstate", listener);
-  }, []);
   useEffect(
     () => () => {
       void audio.stop();
@@ -935,106 +917,43 @@ export function App({
       setMonitoring(enabled);
     }, "monitor");
   }
-  function navigate(next: Tab) {
-    setTab(next);
-    const url = new URL(location.href);
-    url.searchParams.set("tab", next);
-    history.pushState({}, "", url);
-  }
   const globalBusy = Boolean(pending.settings || pending.mode);
   return (
-    <div className="app">
+    <div className={`app desk-app ${output ? "output-app" : "console-app"}`}>
       <a className="skip-link" href="#main">
         跳至控制台
       </a>
-      <header className="topbar">
-        <a
-          className="brand"
-          href={
-            output
-              ? outputKind === "caster"
-                ? "/caster-output"
-                : "/output"
-              : consolePage
-                ? "/console"
-                : "/?tab=listen"
-          }
-          aria-label="PulseMic 收聽控制台"
-        >
-          <img
-            src="/brand/PulseMic_MainLogo.png"
-            width="217"
-            height="72"
-            alt="PulseMic"
-          />
-        </a>
-        <div className="system">
-          <span className={`status ${!connected ? "error" : ""}`}>
-            {connected ? "本機服務已連線" : "本機服務未連線"}
-          </span>
-          <span>
-            {(tab === "caster" && !output ? control.casterState : state)
-              ?.mode === "demo"
-              ? "示範模式"
-              : "Discord 真實模式"}
-          </span>
-        </div>
-        <button
-          className={`panic ${(output ? mix.muted : control.panicMuted) ? "active-danger" : ""}`}
-          aria-pressed={output ? mix.muted : control.panicMuted}
-          disabled={!connected || Boolean(pending.panic)}
-          onClick={() =>
-            output
-              ? updateMix({ ...mix, muted: !mix.muted })
-              : void run(
-                  () => request("/api/panic", { muted: !control.panicMuted }),
-                  "panic",
-                )
-          }
-        >
-          <Icon name="mute" />
-          {(output ? mix.muted : control.panicMuted)
-            ? "全部已靜音 · 取消"
-            : output
-              ? "本頁靜音"
-              : "全部靜音"}
-        </button>
-      </header>
-      <div className="shell">
-        <nav className="navigation" aria-label="主要分頁">
-          <div hidden={output}>
-            {(
-              [
-                { id: "control", text: "導播控制", icon: "signal" },
-                { id: "listen", text: "收聽", icon: "headphones" },
-                { id: "caster", text: "主播台", icon: "headphones" },
-                { id: "settings", text: "設定", icon: "settings" },
-              ] as const
-            ).map((item) => (
-              <a
-                key={item.id}
-                href={`?tab=${item.id}`}
-                aria-current={tab === item.id ? "page" : undefined}
-                onClick={(event) => {
-                  if (
-                    event.button === 0 &&
-                    !event.metaKey &&
-                    !event.ctrlKey &&
-                    !event.shiftKey &&
-                    !event.altKey
-                  ) {
-                    event.preventDefault();
-                    navigate(item.id);
-                  }
-                }}
-              >
-                <Icon name={item.icon} />
-                {item.text}
-              </a>
-            ))}
-            <a href="/output" target="_blank" rel="noopener">
-              音源輸出 ↗
+      {!output ? (
+        <aside className="desk-sidebar">
+          <a
+            className="desk-brand"
+            href="/console"
+            aria-label="PulseMic 控制台"
+          >
+            <img
+              src="/brand/PulseMic_MainLogo.png"
+              width="217"
+              height="72"
+              alt="PulseMic"
+            />
+          </a>
+          <nav aria-label="控制台區域">
+            <a href="#main">
+              <Icon name="headphones" />
+              音控台
             </a>
+            <a href="#outputs">
+              <Icon name="signal" />
+              輸出授權
+            </a>
+            <a href="#settings" onClick={() => setSettingsOpen(true)}>
+              <Icon name="settings" />
+              連線設定
+            </a>
+          </nav>
+          <div className="sidebar-bottom">
+            <img src="/brand/PulseMic_Icon.png" width="42" height="42" alt="" />
+            <span>PulseMic</span>
             {!localHost ? (
               <button
                 onClick={() =>
@@ -1047,46 +966,58 @@ export function App({
               </button>
             ) : null}
           </div>
-          <span>
-            {output ? "獨立音源輸出 · 本頁授權" : "PulseMic 導播控制台"}
+        </aside>
+      ) : null}
+      <div className="desk-content">
+        <header className="topbar">
+          {output ? (
+            <a
+              className="brand"
+              href={outputKind === "caster" ? "/caster-output" : "/output"}
+            >
+              <img
+                src="/brand/PulseMic_MainLogo.png"
+                width="217"
+                height="72"
+                alt="PulseMic"
+              />
+            </a>
+          ) : (
+            <h1>語音控制台</h1>
+          )}
+          <span className={`status ${!connected ? "error" : ""}`}>
+            {connected ? "本機服務已連線" : "本機服務未連線"}
           </span>
-        </nav>
-        <main id="main">
-          <div className="page-heading">
-            <div>
-              <h1>
-                {output
-                  ? outputKind === "caster"
-                    ? "Caster Desk 主播台輸出"
-                    : "音源輸出"
-                  : tab === "listen"
-                    ? "雙路語音監聽"
-                    : tab === "control"
-                      ? "機器人派遣"
-                      : tab === "caster"
-                        ? "PulseMic Caster Desk"
-                        : "系統設定"}
-              </h1>
-              <p>
-                {tab === "listen"
-                  ? "每位成員獨立控制，掌握賽場兩端的聲音。"
-                  : tab === "control"
-                    ? "兩個 Bot 身分，各自選擇 Channel A 或 B。"
-                    : tab === "caster"
-                      ? "主播與賽評的獨立音源，與選手雙路分開派遣、混音及輸出。"
-                      : "驗證 Discord 來源，憑證留在這台電腦。"}
-              </p>
-            </div>
-            <span className="guild-label">
-              {(tab === "caster" && !output
-                ? control.casterState?.guildName
-                : state?.guildName) ?? "尚未設定伺服器"}
-            </span>
-          </div>
-          {state?.mode === "demo" && (output || tab !== "caster") ? (
+          <button
+            className={`panic ${(output ? mix.muted : control.panicMuted) ? "active-danger" : ""}`}
+            aria-pressed={output ? mix.muted : control.panicMuted}
+            disabled={!connected || Boolean(pending.panic)}
+            onClick={() =>
+              output
+                ? updateMix({ ...mix, muted: !mix.muted })
+                : void run(
+                    () => request("/api/panic", { muted: !control.panicMuted }),
+                    "panic",
+                  )
+            }
+          >
+            <Icon name="mute" />
+            {(output ? mix.muted : control.panicMuted)
+              ? "全部已靜音 · 取消"
+              : output
+                ? "本頁靜音"
+                : "全部靜音"}
+          </button>
+        </header>
+        <main id="main" className="desk-main">
+          {output ? (
+            <h1 className="output-title">
+              {outputKind === "caster" ? "Caster Desk 主播台輸出" : "音源輸出"}
+            </h1>
+          ) : null}
+          {output && state?.mode === "demo" ? (
             <div className="demo-banner">
-              <strong>示範模式</strong>
-              <span>虛構伺服器與成員；測試音由本機產生，未連接 Discord。</span>
+              <strong>示範音源</strong>
               <button
                 disabled={!monitoring}
                 aria-pressed={tone}
@@ -1119,241 +1050,158 @@ export function App({
             </div>
           ) : (
             <>
-              {!output && tab !== "settings" && tab !== "caster" ? (
-                <>
-                  <div className="desk-overview" aria-label="選手語音概況">
-                    {ids.map((id) => (
-                      <div
-                        key={id}
-                        className={`overview-lane overview-${id.toLowerCase()}`}
-                      >
-                        <span className="eyebrow">
-                          機器人 {id} / 來源 Channel{" "}
-                          {state.lanes[id].selectedSource}
-                        </span>
-                        <strong title={laneTitle(state.lanes[id])}>
-                          {laneTitle(state.lanes[id])}
-                        </strong>
-                        <span>
-                          {laneStatus(state.lanes[id])} ·{" "}
-                          {state.lanes[id].members.length} 位成員
-                        </span>
-                      </div>
-                    ))}
-                    <div className="overview-guide">
-                      <span className="eyebrow">操作順序</span>
-                      <strong>派遣 → 混音 → 獨立輸出</strong>
-                      <span>控制台設定音量，輸出頁按「開始監聽」播放。</span>
-                    </div>
-                  </div>
-                  <OutputAccess
-                    kind="players"
-                    connected={connected}
-                    request={request}
+              <div
+                className={`mixer-grid ${output && outputKind === "caster" ? "caster-output-grid" : ""}`}
+              >
+                {(output && outputKind === "caster"
+                  ? (["A"] as const)
+                  : ids
+                ).map((id) => (
+                  <LanePanel
+                    key={id}
+                    state={state}
+                    id={id}
+                    readOnly={output}
+                    caster={output && outputKind === "caster"}
+                    mix={mix}
+                    audio={audio}
+                    pending={
+                      output || !connected || globalBusy || Boolean(pending[id])
+                    }
+                    command={output ? () => {} : command}
+                    updateMix={updateMix}
+                    updateMember={updateMember}
                   />
-                </>
-              ) : null}
-              {!output ? (
-                <div hidden={tab !== "caster"}>
+                ))}
+                {!output ? (
                   <CasterDesk
                     state={control.casterState}
                     connected={connected}
                     remoteMix={control.remoteCasterMix}
                     request={request}
-                    localHost={localHost}
                   />
-                </div>
-              ) : null}
-              <div hidden={tab !== "listen"}>
-                <div
-                  className={`mixer-grid ${output && outputKind === "caster" ? "caster-output-grid" : ""}`}
-                >
-                  {(output && outputKind === "caster"
-                    ? (["A"] as const)
-                    : ids
-                  ).map((id) => (
-                    <LanePanel
-                      key={id}
-                      state={state}
-                      id={id}
-                      readOnly={output}
-                      caster={output && outputKind === "caster"}
-                      mix={mix}
-                      audio={audio}
-                      pending={
-                        output ||
-                        !connected ||
-                        globalBusy ||
-                        Boolean(pending[id])
-                      }
-                      command={output ? () => {} : command}
-                      updateMix={updateMix}
-                      updateMember={updateMember}
-                    />
-                  ))}
-                </div>
-                <p className="mix-note">
-                  音量只影響監聽輸出。個別設定依 Discord 使用者 ID
-                  保存，同名成員仍可分別調整。
-                </p>
+                ) : null}
               </div>
-              <div hidden={output || tab !== "control"}>
-                <div className="dispatch-grid">
-                  {ids.map((id) => {
-                    const lane = state.lanes[id];
-                    const busy =
-                      !connected ||
-                      globalBusy ||
-                      Boolean(pending[id]) ||
-                      ["connecting", "disconnecting", "reconnecting"].includes(
-                        lane.status,
-                      );
-                    return (
-                      <section
-                        key={id}
-                        className={`dispatch lane-${id.toLowerCase()}`}
-                      >
-                        <span className="lane-badge">{id}</span>
-                        <h2>機器人 {id}</h2>
-                        <p>
-                          {lane.botName} ·{" "}
-                          {lane.status === "unknown"
-                            ? "Discord 狀態待確認"
-                            : state.mode === "demo"
-                              ? "示範 Bot 就緒"
-                              : lane.botOnline
-                                ? "Discord 在線"
-                                : "尚未連線"}
-                        </p>
-                        <h3>{laneTitle(lane)}</h3>
-                        <p className="connection-text">{laneStatus(lane)}</p>
-                        {lane.error ? (
-                          <p className="form-error">{lane.error}</p>
-                        ) : null}
-                        <SourceButtons
-                          state={state}
-                          lane={lane}
-                          busy={busy}
-                          command={command}
-                        />
-                        <div className="dispatch-actions">
-                          <button
-                            className="primary"
-                            disabled={busy || !state.validated}
-                            onClick={() => command(id, "open")}
-                          >
-                            開啟 · Channel {lane.selectedSource}
-                          </button>
-                          <button
-                            disabled={
-                              busy || !state.validated || lane.status === "idle"
-                            }
-                            onClick={() => command(id, "close")}
-                          >
-                            關閉語音
-                          </button>
-                        </div>
-                        <p>
-                          開啟加入上次選定來源。關閉退出語音，保留 Bot 在線。
-                        </p>
-                      </section>
-                    );
-                  })}
-                </div>
-                <div className="mode-panel">
-                  <div>
-                    <h2>操作演練</h2>
-                    <p>
-                      切換模式會讓兩隻 Bot
-                      退出語音。示範模式可演練派遣、同頻道備援及音量調整。
-                    </p>
-                  </div>
-                  <button
-                    disabled={globalBusy || !connected}
-                    onClick={() => {
-                      setTone(false);
-                      audio.toggleTone(false);
-                      void run(
-                        () =>
-                          request("/api/mode", {
-                            mode: state.mode === "demo" ? "live" : "demo",
-                          }),
-                        "mode",
-                      );
-                    }}
+              {!output ? (
+                <>
+                  <section
+                    id="outputs"
+                    className="outputs-grid"
+                    aria-label="輸出授權"
                   >
-                    {state.mode === "demo" ? "返回真實模式" : "進入示範模式"}
-                  </button>
-                </div>
-              </div>
-              <div hidden={output || tab !== "settings"}>
-                {localHost ? (
-                  <Settings
-                    state={state}
-                    request={request}
-                    run={run}
-                    pending={!connected || globalBusy}
-                  />
-                ) : (
-                  <div className="mode-panel">
-                    <div>
-                      <h2>憑證只能在主機設定</h2>
-                      <p>
-                        請在執行 PulseMic 的 Windows 電腦開啟
-                        http://localhost:3210/console?tab=settings。公網不提供
-                        Bot Token 輸入。
+                    <OutputAccess
+                      kind="players"
+                      connected={connected}
+                      request={request}
+                    />
+                    <OutputAccess
+                      kind="caster"
+                      connected={connected}
+                      request={request}
+                    />
+                  </section>
+                  <details
+                    id="settings"
+                    className="desk-settings"
+                    open={settingsOpen}
+                    onToggle={(event) =>
+                      setSettingsOpen(event.currentTarget.open)
+                    }
+                  >
+                    <summary>
+                      <Icon name="settings" />
+                      連線設定
+                    </summary>
+                    {localHost ? (
+                      <div className="connection-grid">
+                        <div>
+                          <Settings
+                            state={state}
+                            request={request}
+                            run={run}
+                            pending={!connected || globalBusy}
+                          />
+                          <div className="mode-actions">
+                            <button
+                              disabled={globalBusy || !connected}
+                              onClick={() => {
+                                setTone(false);
+                                audio.toggleTone(false);
+                                void run(
+                                  () =>
+                                    request("/api/mode", {
+                                      mode:
+                                        state.mode === "demo" ? "live" : "demo",
+                                    }),
+                                  "mode",
+                                );
+                              }}
+                            >
+                              {state.mode === "demo"
+                                ? "返回真實模式"
+                                : "進入示範模式"}
+                            </button>
+                          </div>
+                        </div>
+                        <CasterSettings
+                          state={control.casterState}
+                          connected={connected}
+                          request={request}
+                        />
+                      </div>
+                    ) : (
+                      <p className="local-settings-note">
+                        Bot 憑證請於 Windows 主機的本機控制台設定。
                       </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    )}
+                  </details>
+                </>
+              ) : null}
             </>
           )}
         </main>
-      </div>
-      <footer className="monitor-bar">
-        <div className="monitor-title">
-          <Icon name="headphones" />
-          <div>
-            <strong>
-              {consolePage
-                ? "控制台不播放音訊"
-                : monitoring
-                  ? "耳機監聽中"
-                  : "耳機監聽已停止"}
-            </strong>
-            <span>
-              {consolePage ? "請另開音源輸出頁並輸入一次性授權碼" : audioStatus}
-            </span>
+        <footer className="monitor-bar">
+          {output ? (
+            <>
+              <div className="monitor-title">
+                <Icon name="headphones" />
+                <div>
+                  <strong>
+                    {monitoring ? "耳機監聽中" : "耳機監聽已停止"}
+                  </strong>
+                  <span>{audioStatus}</span>
+                </div>
+              </div>
+              <button
+                className={monitoring ? "" : "primary"}
+                disabled={
+                  Boolean(pending.monitor) || (!connected && !monitoring)
+                }
+                onClick={() => void toggleMonitor()}
+              >
+                {pending.monitor
+                  ? "處理中…"
+                  : monitoring
+                    ? "停止監聽"
+                    : "開始監聽"}
+              </button>
+            </>
+          ) : null}
+          <div className="recent" aria-live="polite">
+            <span>最近操作</span>
+            <p>{recentNotice}</p>
           </div>
-        </div>
-        <button
-          hidden={consolePage}
-          className={monitoring ? "" : "primary"}
-          disabled={Boolean(pending.monitor) || (!connected && !monitoring)}
-          onClick={() => {
-            void toggleMonitor();
-          }}
-        >
-          {pending.monitor ? "處理中…" : monitoring ? "停止監聽" : "開始監聽"}
-        </button>
-        <div className="master" hidden={consolePage && tab === "caster"}>
-          <strong>{consolePage ? "選手輸出總音量" : "耳機總音量"}</strong>
-          <Volume
-            max={100}
-            label="耳機總音量"
-            value={mix.master}
-            onChange={(master) => updateMix({ ...mix, master })}
-          />
-        </div>
-        <div className="recent" aria-live="polite">
-          <span>最近操作</span>
-          <p>
-            {(tab === "caster" && !output ? control.casterState : state)
-              ?.notice ?? "等待本機服務連線"}
-          </p>
-        </div>
-      </footer>
+          <div className="master">
+            <strong>{consolePage ? "選手輸出總音量" : "耳機總音量"}</strong>
+            <Volume
+              max={100}
+              label="耳機總音量"
+              value={mix.master}
+              onChange={(master) => updateMix({ ...mix, master })}
+            />
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

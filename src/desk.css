@@ -1,0 +1,758 @@
+.desk-app {
+  --desk-line: #7187a12e;
+  --desk-panel: #18263bc7;
+  --muted: #a8b8ce;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 85% 0%, #42457650, transparent 58%),
+    radial-gradient(ellipse at 20% 65%, #08768a35, transparent 58%), #071422;
+}
+.desk-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 208px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: #06111de8;
+  border-right: 1px solid var(--desk-line);
+}
+.desk-brand {
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--desk-line);
+}
+.desk-brand img {
+  width: 168px;
+  height: 56px;
+}
+.desk-sidebar nav {
+  padding: 22px 12px;
+  display: grid;
+  gap: 10px;
+}
+.desk-sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 50px;
+  padding: 12px 16px;
+  color: #bdcbe0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  text-decoration: none;
+  font-weight: 600;
+}
+.desk-sidebar nav a:first-child,
+.desk-sidebar nav a:hover {
+  background: #41659b25;
+  border-color: #7999c42e;
+  color: #edf3f7;
+}
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 20px 14px;
+  border-top: 1px solid var(--desk-line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar-bottom button {
+  margin-left: auto;
+  padding: 8px;
+  font-size: 12px;
+}
+.desk-content {
+  margin-left: 208px;
+  min-width: 0;
+}
+.output-app .desk-content {
+  margin-left: 0;
+}
+.desk-app .topbar {
+  min-height: 78px;
+  padding: 14px 26px;
+  background: #091524c9;
+  border-color: var(--desk-line);
+  gap: 24px;
+}
+.desk-app .topbar h1 {
+  font-size: 25px;
+  line-height: 1.4;
+  letter-spacing: -0.03em;
+}
+.desk-app .topbar > .status {
+  font-size: 12px;
+}
+.desk-app .topbar .panic {
+  border-radius: 9px;
+  min-height: 42px;
+  background: #6a283638;
+}
+.desk-app .desk-main {
+  padding: 26px 26px 120px;
+  max-width: 1800px;
+  margin-inline: auto;
+  scroll-margin-top: 100px;
+}
+.desk-app .mixer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.desk-app.output-app .mixer-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 1400px;
+  margin-inline: auto;
+}
+.desk-app .caster-desk {
+  display: contents;
+}
+.desk-app .lane {
+  background: var(--desk-panel);
+  border: 1px solid var(--desk-line);
+  border-radius: 15px;
+  min-width: 0;
+  overflow: hidden;
+}
+.desk-app .lane-c {
+  --accent: #ad9be9;
+}
+.desk-app .lane-heading {
+  padding: 20px 18px 12px;
+  gap: 11px;
+  align-items: flex-start;
+}
+.desk-app .lane-badge {
+  min-width: 6px;
+  width: 6px;
+  height: 32px;
+  border: 0;
+  background: var(--accent);
+  border-radius: 4px;
+  font-size: 0;
+  margin-top: 5px;
+}
+.desk-app .lane-heading > div {
+  min-width: 0;
+}
+.desk-app .lane-heading h2 {
+  font-size: 20px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+.desk-app .lane-heading p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.desk-app .lane-heading .status {
+  flex-basis: 100%;
+  padding-left: 17px;
+  font-size: 11px;
+}
+.desk-app .lane-meta {
+  padding: 0 18px 10px;
+  gap: 8px;
+  font-size: 11px;
+}
+.desk-app .lane-meta small {
+  font-size: 10px;
+}
+.desk-app .demo-tag {
+  margin: 0 18px 10px;
+  color: #e8b35a;
+  font-size: 11px;
+  align-self: flex-start;
+}
+.desk-app .playback-info {
+  padding: 8px 18px;
+  min-height: 32px;
+  background: transparent;
+  border-block: 1px solid var(--desk-line);
+  font-size: 10px;
+}
+.desk-app .lane-controls {
+  padding: 12px 18px 10px;
+  gap: 12px;
+}
+.desk-app .lane-controls span {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.desk-app .source-buttons {
+  padding: 0 18px 12px;
+  gap: 8px;
+}
+.desk-app .source-buttons button {
+  padding: 8px 10px;
+  border-radius: 7px;
+  gap: 2px;
+  background: #20355055;
+  border-color: var(--desk-line);
+}
+.desk-app .source-buttons button.selected {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.desk-app .source-buttons span {
+  font-size: 12px;
+}
+.desk-app .source-buttons strong {
+  font-size: 11px;
+}
+.desk-app .power {
+  background: #243b5b55;
+  border-color: #7890aa45;
+  border-radius: 8px;
+  min-height: 40px;
+  font-size: 12px;
+}
+.desk-app .member-header {
+  padding: 10px 18px;
+  background: transparent;
+  border-block: 1px solid var(--desk-line);
+  font-size: 11px;
+}
+.desk-app .members {
+  max-height: 300px;
+  min-height: 216px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #64758b66 transparent;
+  overscroll-behavior: contain;
+  flex: 1;
+}
+.desk-app .member {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(90px, 1.1fr) 32px;
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  min-height: 72px;
+  background: transparent;
+  border-color: var(--desk-line);
+}
+.desk-app .member .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  grid-row: 1;
+}
+.desk-app .member .avatar img {
+  border-radius: 50%;
+}
+.desk-app .member-info {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.desk-app .member-info strong {
+  font-size: 13px;
+}
+.desk-app .member-info span {
+  font-size: 10px;
+}
+.desk-app .member > .volume {
+  grid-column: 3;
+  grid-row: 1;
+  width: auto;
+  min-width: 0;
+}
+.desk-app .member > .square {
+  grid-column: 4;
+  grid-row: 1;
+  width: 32px;
+  height: 36px;
+  min-height: 36px;
+  padding: 6px;
+  border-color: var(--desk-line);
+  background: #22334950;
+  border-radius: 7px;
+}
+.desk-app .meter {
+  height: 3px;
+  margin-top: 5px;
+}
+.desk-app .volume {
+  min-width: 0;
+  gap: 12px;
+}
+.desk-app .volume input {
+  min-width: 0;
+}
+.desk-app .volume output {
+  font-size: 15px;
+  min-width: 42px;
+  font-family: Barlow, sans-serif;
+}
+.desk-app .empty {
+  min-height: 216px;
+  flex: 1;
+  padding: 30px 15px;
+}
+.desk-app .empty strong {
+  font-size: 13px;
+}
+.desk-app .lane-mix {
+  padding: 16px 18px;
+  background: #13203950;
+  border-top: 1px solid var(--desk-line);
+  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.desk-app .lane-mix > div:first-child {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.desk-app .lane-mix strong {
+  font-size: 12px;
+}
+.desk-app .lane-mix > div:first-child > span {
+  display: none;
+}
+.desk-app .mix-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.desk-app .mix-buttons button {
+  font-size: 11px;
+  min-height: 36px;
+  background: transparent;
+  border-color: var(--desk-line);
+  border-radius: 7px;
+}
+.desk-app .caster-master {
+  padding: 12px 18px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--desk-line);
+  background: transparent;
+  border-radius: 0;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.desk-app .caster-master strong {
+  font-size: 11px;
+}
+.desk-app .outputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 22px;
+  scroll-margin-top: 100px;
+}
+.desk-app .output-access {
+  padding: 22px;
+  border: 1px solid var(--desk-line);
+  background: var(--desk-panel);
+  border-radius: 15px;
+  margin: 0;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.desk-app .output-access h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.desk-app .output-actions {
+  gap: 10px;
+  flex-direction: row;
+  align-items: center;
+}
+.desk-app .output-actions button,
+.desk-app .output-link {
+  min-height: 40px;
+  padding: 10px 12px;
+  font-size: 12px;
+  border: 1px solid #6b8aad55;
+  border-radius: 8px;
+  background: #334e7450;
+  text-decoration: none;
+  color: #e2efff;
+}
+.desk-app .output-access[aria-label="主播台輸出授權"] .output-link {
+  border-color: #9b85d455;
+  background: #8061b62a;
+}
+.desk-app .issued-code {
+  min-width: 0;
+  max-width: 100%;
+}
+.desk-app .issued-code input {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 7px;
+  border: 1px solid var(--desk-line);
+  background: #081523;
+  color: inherit;
+}
+.desk-app .desk-settings {
+  margin-top: 22px;
+  border: 1px solid var(--desk-line);
+  border-radius: 15px;
+  background: var(--desk-panel);
+  scroll-margin-top: 100px;
+}
+.desk-app .desk-settings summary {
+  list-style: none;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 24px;
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 600;
+}
+.desk-app .desk-settings summary::after {
+  content: "+";
+  margin-left: auto;
+  font-family: Barlow, sans-serif;
+  font-size: 24px;
+}
+.desk-app .desk-settings[open] summary::after {
+  content: "−";
+}
+.desk-app .desk-settings summary:focus-visible {
+  outline: 3px solid #edf3f7;
+  outline-offset: 3px;
+}
+.desk-app .connection-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  border-top: 1px solid var(--desk-line);
+}
+.desk-app .connection-grid > div {
+  padding: 24px;
+  border-right: 1px solid var(--desk-line);
+}
+.desk-app .settings-layout {
+  display: block;
+}
+.desk-app .settings-panel,
+.desk-app .caster-settings {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.desk-app .caster-settings {
+  padding: 24px;
+}
+.desk-app .settings-panel h2,
+.desk-app .caster-settings h2 {
+  font-size: 17px;
+  margin: 0 0 22px;
+}
+.desk-app .caster-settings form {
+  margin: 0;
+  gap: 8px;
+}
+.desk-app .caster-settings label {
+  margin-top: 4px;
+}
+.desk-app .settings-panel label {
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.desk-app .settings-panel input,
+.desk-app .caster-settings input {
+  background: #07142390;
+  border-color: #7187a155;
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+.desk-app .verified,
+.desk-app .caster-verified {
+  background: transparent;
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--desk-line);
+  margin-top: 18px;
+  font-size: 12px;
+}
+.desk-app .verified > strong {
+  font-size: 12px;
+}
+.desk-app .mode-actions {
+  padding-top: 18px;
+}
+.desk-app .mode-actions button,
+.desk-app .caster-mode button {
+  min-height: 38px;
+  font-size: 12px;
+  background: transparent;
+  border-color: var(--desk-line);
+}
+.desk-app .local-settings-note {
+  padding: 0 24px 24px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.desk-app .monitor-bar {
+  left: 208px;
+  right: 0;
+  padding: 14px 26px;
+  min-height: 72px;
+  background: #071321ed;
+  border-color: var(--desk-line);
+  gap: 24px;
+  display: flex;
+  flex-wrap: nowrap;
+}
+.desk-app.output-app .monitor-bar {
+  left: 0;
+}
+.desk-app .recent {
+  flex: 1;
+  max-width: none;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.desk-app .recent > span {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.desk-app .recent p {
+  font-size: 11px;
+  line-height: 1.6;
+  max-height: none;
+  overflow-wrap: anywhere;
+}
+.desk-app .master {
+  flex: 0 1 330px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  min-width: 180px;
+}
+.desk-app .master > strong {
+  font-size: 11px;
+}
+.desk-app .output-title {
+  font-size: 26px;
+  margin-bottom: 24px;
+}
+.desk-app .demo-banner {
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.desk-app .error-banner {
+  font-size: 12px;
+  border-radius: 8px;
+}
+@media (max-width: 1250px) {
+  .desk-sidebar {
+    width: 168px;
+  }
+  .desk-brand {
+    padding: 15px;
+  }
+  .desk-brand img {
+    width: 138px;
+  }
+  .desk-sidebar nav a {
+    padding: 12px;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .desk-content {
+    margin-left: 168px;
+  }
+  .desk-app .monitor-bar {
+    left: 168px;
+  }
+  .desk-app .desk-main {
+    padding-inline: 18px;
+  }
+  .desk-app .mixer-grid {
+    gap: 12px;
+  }
+  .desk-app .lane-heading {
+    padding-inline: 14px;
+  }
+  .desk-app .lane-heading h2 {
+    font-size: 18px;
+  }
+  .desk-app .outputs-grid {
+    gap: 12px;
+  }
+}
+@media (max-width: 1000px) {
+  .desk-sidebar {
+    width: 76px;
+  }
+  .desk-brand {
+    padding: 17px;
+  }
+  .desk-brand img {
+    width: 42px;
+    object-fit: cover;
+    object-position: left;
+  }
+  .desk-sidebar nav {
+    padding-inline: 7px;
+  }
+  .desk-sidebar nav a {
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 4px;
+    font-size: 10px;
+  }
+  .sidebar-bottom {
+    padding: 15px;
+    flex-direction: column;
+  }
+  .sidebar-bottom span {
+    display: none;
+  }
+  .desk-content {
+    margin-left: 76px;
+  }
+  .desk-app .monitor-bar {
+    left: 76px;
+  }
+  .desk-app .mixer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .desk-app .caster-mixer .lane {
+    grid-column: 1 / -1;
+  }
+  .desk-app .connection-grid {
+    grid-template-columns: 1fr;
+  }
+  .desk-app .connection-grid > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--desk-line);
+  }
+  .desk-app .output-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 700px) {
+  .desk-sidebar {
+    position: static;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    border-right: 0;
+    border-bottom: 1px solid var(--desk-line);
+  }
+  .desk-brand {
+    padding: 8px 10px;
+    border-bottom: 0;
+    flex-shrink: 0;
+  }
+  .desk-brand img {
+    width: 42px;
+    height: 42px;
+  }
+  .desk-sidebar nav {
+    display: flex;
+    padding: 6px;
+    gap: 2px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .desk-sidebar nav a {
+    padding: 8px;
+    min-height: 44px;
+    font-size: 10px;
+    gap: 4px;
+  }
+  .sidebar-bottom {
+    display: none;
+  }
+  .desk-content {
+    margin-left: 0;
+  }
+  .desk-app .topbar {
+    padding: 12px;
+    gap: 10px;
+    min-height: 66px;
+    flex-wrap: wrap;
+  }
+  .desk-app .topbar h1 {
+    font-size: 20px;
+  }
+  .desk-app .topbar > .status {
+    font-size: 10px;
+    order: 3;
+    flex-basis: 100%;
+  }
+  .desk-app .topbar .panic {
+    font-size: 11px;
+    padding: 8px 10px;
+    min-height: 38px;
+  }
+  .desk-app .desk-main {
+    padding: 16px 12px 140px;
+  }
+  .desk-app .mixer-grid,
+  .desk-app.output-app .mixer-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .desk-app .outputs-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .desk-app .output-access {
+    padding: 18px;
+  }
+  .desk-app .output-actions {
+    width: 100%;
+  }
+  .desk-app .output-actions > * {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+  .desk-app .monitor-bar,
+  .desk-app.output-app .monitor-bar {
+    left: 0;
+    padding: 10px 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .desk-app .recent {
+    flex-basis: 100%;
+    gap: 8px;
+  }
+  .desk-app .master {
+    flex: 1;
+    min-width: 0;
+    grid-template-columns: 100px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+  .desk-app .connection-grid > div,
+  .desk-app .caster-settings {
+    padding: 18px;
+  }
+  .desk-app .settings-panel .field-pair {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .desk-app .lane-heading h2 {
+    font-size: 21px;
+  }
+}

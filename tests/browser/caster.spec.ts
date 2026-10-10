@@ -10,9 +10,22 @@ test("caster desk has a separate stream, scoped code, mixer and shared emergency
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/console?tab=caster");
   await expect(
-    page.getByRole("heading", { name: "PulseMic Caster Desk", exact: true }),
+    page.getByRole("heading", { name: "語音控制台", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Caster Desk Bot Token")).toHaveValue("");
+  await expect(page.locator(".mixer-grid .lane")).toHaveCount(3);
+  await expect(page.getByLabel("機器人 A Token", { exact: false })).toHaveValue(
+    "",
+  );
+  await expect(page.getByLabel("機器人 B Token", { exact: false })).toHaveValue(
+    "",
+  );
+  await expect(
+    page.getByText(
+      "第三個獨立 Bot；不占用選手 A/B。設定變更前請先退出主播台語音。",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
   const session = (await (await request.get("/api/session")).json()).session;
   const headers = {
     "X-PulseMic-Session": session,

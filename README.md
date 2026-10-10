@@ -19,13 +19,13 @@
 
 - `https://mic.pulse-studio.live/`：Discord 登入首頁。
 - `/console`：控制台；目前僅允許 Discord 使用者 ID `1456945476933914626`。其他帳號在後端拒絕，不能操作 API 或控制 WebSocket。
-- `/output`：選手 A/B 音源輸出頁。導播在控制台點「產生一次性授權碼」，私下提供給收聽者；收聽者輸入後點「開始監聽」。控制台本身不播放音訊，輸出頁無 Bot 操作權限。
-- `/console?tab=caster`：PulseMic Caster Desk 主播台工作區；第三個獨立 Bot，只加入自己的主播台語音來源。
+- `/output`：選手 A/B 音源輸出頁。導播在控制台點「產生授權碼」，私下提供給收聽者；收聽者輸入後點「開始監聽」。控制台本身不播放音訊，輸出頁無 Bot 操作權限。
+- `/console` 同頁並列選手 A/B 與 PulseMic Caster Desk；下方集中兩種輸出授權和「連線設定」，側欄連結直接定位區域。主播台仍使用第三個獨立 Bot 與獨立輸出頁。
 - `/caster-output`：主播台獨立輸出頁；必須使用主播台專用授權碼。選手與主播台授權碼、播放授權和 WebSocket 來源互不通用，輸出頁只收到所屬來源。
 - 一碼只兌換一次，5 分鐘內有效。播放授權只在當前頁面記憶體中，僅可開啟一條輸出連線，最長 8 小時；重新整理、離開或斷線後需新碼。授權碼不放入網址、Cookie 或 localStorage，服務重啟會撤銷所有登入、授權碼與播放授權。
 - 選手與主播台有獨立混音設定，音量、靜音及 solo 同步到各自已連線的輸出頁；輸出頁也可自行調整目前裝置的播放音量。停止播放不影響 Bot 所在頻道。控制台頂部「全部靜音」會停止選手與主播台所有輸出，取消後恢復原先的個別／單路／總音量；輸出頁的「本頁靜音」只影響目前裝置。
 - 本機輸出保留逐成員 Opus / WebRTC；遠端輸出以 HTTPS/WSS 傳送逐成員 Opus，由瀏覽器 WebCodecs 解碼，再以 Web Audio 分別調音。需要支援 Opus AudioDecoder 的新版 Edge／Chrome。不預先混音。網路壅塞時停止輸出並要求新碼，避免累積延遲。
-- 公網 Bot Token 設定被禁止；憑證只能從 `http://localhost:3210/console?tab=settings` 輸入。
+- 公網 Bot Token 設定被禁止；憑證只能從 `http://localhost:3210/console#settings` 輸入。
 
 ### Discord OAuth 登入設定
 
@@ -83,7 +83,7 @@ npm run test:browser
 ### PulseMic Caster Desk
 
 1. 另建第三個 Discord Bot，名稱設為 **PulseMic Caster Desk**；不可沿用選手 A/B 的 Bot 身分。邀請到所需伺服器，只需查看／連接主播台的一般語音頻道。
-2. 在 Windows 本機開啟 `http://localhost:3210/console?tab=caster`，輸入主播台伺服器 ID、語音頻道 ID 與第三個 Bot Token，按「保存並驗證主播台」。Token 不回傳至瀏覽器；保存後欄位清空，留空可沿用。
+2. 在 Windows 本機開啟 `http://localhost:3210/console#settings`，輸入主播台伺服器 ID、語音頻道 ID 與第三個 Bot Token，按「保存並驗證主播台」。Token 不回傳至瀏覽器；保存後欄位清空，留空可沿用。
 3. 主播台憑證獨立以 CurrentUser DPAPI 保存於 `%LOCALAPPDATA%\PulseMic\caster.secrets`；選手仍使用 `credentials.secrets`。移轉電腦須重新輸入。
 4. 成功後顯示 Discord 實際伺服器與頻道名稱。按「開啟主播台語音」才加入；首次啟動不自動加入。關閉僅退出語音，保持 Discord 在線。
 5. 於同一工作區調整主播／賽評個別音量、靜音與主播台總音量，產生主播台專用授權碼，再另開 `/caster-output` 輸入，點「開始監聽」。每位成員保留獨立音源，所有自己派遣的 Bot 均不列入可監聽成員。
@@ -149,7 +149,7 @@ React / TypeScript / Vite；Node.js / TypeScript / discord.js；`@discordjs/voic
 
 瀏覽器測試使用 Edge，檢查桌面／390 px 窄螢幕、示範派遣、個別音量／靜音、保存、同頻道播放接手、停止監聽不退出 Bot、鍵盤焦點與 console。另以真實 localhost WebRTC 連線驗證兩個獨立 Opus 音軌封包接收；這不是 Discord 收音驗證。
 
-2026-10-11 更新檢查：型別檢查、正式版建置及隔離預覽建置通過；28 項 Node 測試、12 項 Edge／HTTP／WebSocket 整合測試通過，Windows 啟動檔 preflight 通過。新增主播台單 Bot、頻道重新命名、Bot 身分保留／衝突、Windows 主播台加密設定、輸出授權範圍、主播台獨立混音、全域緊急靜音與 320／390 px 版面測試。測試音／封包不代表 Discord 收音。
+2026-10-11 更新檢查：型別檢查、正式版建置及隔離預覽建置通過；28 項 Node 測試、12 項 Edge／HTTP／WebSocket 整合測試通過，Windows 啟動檔 preflight 通過。本次控制台改為單頁三路音控、集中 Token 設定與輸出授權，移除重複教學文案；示範標記保留於音源，避免混淆真實連線。測試涵蓋主播台單 Bot、頻道重新命名、Bot 身分保留／衝突、Windows 主播台加密設定、輸出授權範圍、主播台獨立混音、全域緊急靜音與 320／390 px 版面測試。測試音／封包不代表 Discord 收音。
 
 既有公網入口及專用 Cloudflare Tunnel 已發布；Discord OAuth 憑證已在本機設定並驗證登入導向。這次版本先於隔離服務驗證；發布檢查發現本機 3210 與專用 Tunnel 均未執行，已依既有發布授權只啟動 PulseMic 及專用 Tunnel。新版三個入口回傳 200、匿名 session／state 回傳 401／403；公網主播台授權碼與 WSS 專用來源驗證通過，跨輸出授權拒絕。服務新啟動後需重新登入並取得新的輸出授權碼。OAuth 及 Bot 憑證不納入 Git。
 

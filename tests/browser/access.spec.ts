@@ -53,9 +53,9 @@ test("separate output page consumes code once and refresh requires a new code", 
     output.getByText("本機服務已連線", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
-  await expect(
-    output.getByRole("button", { name: "產生一次性授權碼" }),
-  ).toHaveCount(0);
+  await expect(output.getByRole("button", { name: "產生授權碼" })).toHaveCount(
+    0,
+  );
   await expect(output.getByRole("button", { name: "開啟語音" })).toBeHidden();
   await output.getByRole("button", { name: "開始監聽", exact: true }).click();
   await expect(
