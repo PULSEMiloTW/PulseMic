@@ -1,4 +1,4 @@
-param([switch]$CheckOnly)
+param([switch]$CheckOnly, [switch]$PrepareOnly)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
@@ -16,6 +16,7 @@ function Test-PulseMic {
   } catch { return $false }
 }
 if (Test-PulseMic) {
+  if ($PrepareOnly -and -not $CheckOnly) { Write-Output "PulseMic is already running. Reused the local service."; exit 3 }
   if (-not $CheckOnly) { Start-Process $controlUrl }
   Write-Output 'PulseMic is already running. Reused the local service.'
   exit 0
@@ -35,6 +36,7 @@ if (-not (Test-Path -LiteralPath 'node_modules/.package-lock.json') -or $install
 & npm.cmd run build
 if ($LASTEXITCODE -ne 0) { throw 'Build failed. See the errors above.' }
 if ($CheckOnly) { Write-Output 'PulseMic launcher preflight passed.'; exit 0 }
+if ($PrepareOnly) { Write-Output "PulseMic is ready for CMD startup."; exit 0 }
 $browserHelper = "Start-Sleep -Seconds 3; Start-Process '$controlUrl'"
 Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', $browserHelper)
 Write-Output 'Leave this console open. Press Ctrl+C to stop PulseMic.'
