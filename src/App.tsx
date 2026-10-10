@@ -17,6 +17,7 @@ import { useControl } from "./useControl";
 
 type Tab = "listen" | "control" | "settings";
 function readTab(): Tab {
+  if (location.pathname === "/output") return "listen";
   const tab = new URLSearchParams(location.search).get("tab");
   return tab === "settings" || tab === "control" ? tab : "listen";
 }
@@ -188,6 +189,7 @@ function LanePanel({
   command,
   updateMix,
   updateMember,
+  readOnly = false,
 }: {
   state: Snapshot;
   id: LaneId;
@@ -201,6 +203,7 @@ function LanePanel({
   ) => void;
   updateMix: (next: Mix) => void;
   updateMember: (id: string, value: MemberMix) => void;
+  readOnly?: boolean;
 }) {
   const lane = state.lanes[id];
   const busy =
@@ -266,7 +269,7 @@ function LanePanel({
           </>
         )}
       </div>
-      <div className="lane-controls">
+      <div className="lane-controls" hidden={readOnly}>
         <button
           className="power"
           disabled={busy || !state.validated}
@@ -285,7 +288,14 @@ function LanePanel({
         </button>
         <span>派遣來源</span>
       </div>
-      <SourceButtons state={state} lane={lane} busy={busy} command={command} />
+      {!readOnly ? (
+        <SourceButtons
+          state={state}
+          lane={lane}
+          busy={busy}
+          command={command}
+        />
+      ) : null}
       <div className="member-header">
         <span>成員音源</span>
         <span>音量 / 靜音</span>
@@ -552,12 +562,23 @@ function Settings({
     </div>
   );
 }
-export function App() {
+export function App({ outputToken }: { outputToken?: string } = {}) {
+  const output = Boolean(outputToken);
+  const consolePage = !output;
+  const localHost =
+    location.hostname === "localhost" || location.hostname === "127.0.0.1";
   const [audio] = useState(() => new HeadphoneMixer());
-  const control = useControl(audio);
+  const control = useControl(audio, outputToken);
+  const [outputCode, setOutputCode] = useState("");
   const { state, connected, error, setError, request, monitor } = control;
   const [mix, setMix] = useState(readMix);
   const mixRef = useRef(mix);
+  useEffect(() => {
+    if (!output || !control.remoteMix) return;
+    mixRef.current = control.remoteMix;
+    audio.updateMix(control.remoteMix);
+    setMix(control.remoteMix);
+  }, [audio, output, control.remoteMix]);
   const [tab, setTab] = useState<Tab>(readTab);
   const [monitoring, setMonitoring] = useState(false);
   const [audioStatus, setAudioStatus] = useState("耳機監聽尚未啟用");
@@ -614,6 +635,14 @@ export function App() {
     mixRef.current = next;
     audio.updateMix(next);
     setMix(next);
+    if (!output)
+      void request("/api/mix", next).catch((failure) =>
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "輸出音量同步失敗，請重試。",
+        ),
+      );
   }
   const updateMember = useRef((id: string, value: MemberMix) => {
     const current = mixRef.current;
@@ -648,7 +677,7 @@ export function App() {
       <header className="topbar">
         <a
           className="brand"
-          href="/?tab=listen"
+          href={output ? "/output" : consolePage ? "/console" : "/?tab=listen"}
           aria-label="PulseMic 收聽控制台"
         >
           <img
@@ -677,7 +706,7 @@ export function App() {
       </header>
       <div className="shell">
         <nav className="navigation" aria-label="主要分頁">
-          <div>
+          <div hidden={output}>
             {(
               [
                 { id: "control", text: "導播控制", icon: "signal" },
@@ -706,18 +735,36 @@ export function App() {
                 {item.text}
               </a>
             ))}
+            <a href="/output" target="_blank" rel="noopener">
+              音源輸出 ↗
+            </a>
+            {!localHost ? (
+              <button
+                onClick={() =>
+                  void fetch("/auth/logout", { method: "POST" }).then(() =>
+                    location.assign("/"),
+                  )
+                }
+              >
+                登出
+              </button>
+            ) : null}
           </div>
-          <span>Windows 本機音控台</span>
+          <span>
+            {output ? "獨立音源輸出 · 本頁授權" : "PulseMic 導播控制台"}
+          </span>
         </nav>
         <main id="main">
           <div className="page-heading">
             <div>
               <h1>
-                {tab === "listen"
-                  ? "雙路語音監聽"
-                  : tab === "control"
-                    ? "機器人派遣"
-                    : "系統設定"}
+                {output
+                  ? "音源輸出"
+                  : tab === "listen"
+                    ? "雙路語音監聽"
+                    : tab === "control"
+                      ? "機器人派遣"
+                      : "系統設定"}
               </h1>
               <p>
                 {tab === "listen"
@@ -762,6 +809,57 @@ export function App() {
             </div>
           ) : (
             <>
+              {!output ? (
+                <div className="output-access">
+                  <div>
+                    <strong>獨立音源輸出授權</strong>
+                    <p>
+                      產生一次性授權碼，在另一個分頁的音源輸出頁輸入。重新整理須取得新碼。
+                    </p>
+                  </div>
+                  <button
+                    disabled={!connected || Boolean(pending.code)}
+                    onClick={() =>
+                      void run(async () => {
+                        const response = await fetch("/api/output-code", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            "X-PulseMic-Session": (
+                              await (
+                                await fetch("/api/session", {
+                                  cache: "no-store",
+                                })
+                              ).json()
+                            ).session,
+                          },
+                          body: "{}",
+                        });
+                        if (!response.ok)
+                          throw new Error("無法產生授權碼，請重試。");
+                        const body = await response.json();
+                        setOutputCode(body.code);
+                      }, "code")
+                    }
+                  >
+                    產生一次性授權碼
+                  </button>
+                  {outputCode ? (
+                    <div className="issued-code">
+                      <label htmlFor="issued-code">
+                        授權碼（5 分鐘內使用；請私下交付）
+                      </label>
+                      <input
+                        id="issued-code"
+                        readOnly
+                        value={outputCode}
+                        onFocus={(event) => event.currentTarget.select()}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div hidden={tab !== "listen"}>
                 <div className="mixer-grid">
                   {ids.map((id) => (
@@ -769,10 +867,16 @@ export function App() {
                       key={id}
                       state={state}
                       id={id}
+                      readOnly={output}
                       mix={mix}
                       audio={audio}
-                      pending={!connected || globalBusy || Boolean(pending[id])}
-                      command={command}
+                      pending={
+                        output ||
+                        !connected ||
+                        globalBusy ||
+                        Boolean(pending[id])
+                      }
+                      command={output ? () => {} : command}
                       updateMix={updateMix}
                       updateMember={updateMember}
                     />
@@ -783,7 +887,7 @@ export function App() {
                   保存，同名成員仍可分別調整。
                 </p>
               </div>
-              <div hidden={tab !== "control"}>
+              <div hidden={output || tab !== "control"}>
                 <div className="dispatch-grid">
                   {ids.map((id) => {
                     const lane = state.lanes[id];
@@ -872,13 +976,26 @@ export function App() {
                   </button>
                 </div>
               </div>
-              <div hidden={tab !== "settings"}>
-                <Settings
-                  state={state}
-                  request={request}
-                  run={run}
-                  pending={!connected || globalBusy}
-                />
+              <div hidden={output || tab !== "settings"}>
+                {localHost ? (
+                  <Settings
+                    state={state}
+                    request={request}
+                    run={run}
+                    pending={!connected || globalBusy}
+                  />
+                ) : (
+                  <div className="mode-panel">
+                    <div>
+                      <h2>憑證只能在主機設定</h2>
+                      <p>
+                        請在執行 PulseMic 的 Windows 電腦開啟
+                        http://localhost:3210/console?tab=settings。公網不提供
+                        Bot Token 輸入。
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -888,11 +1005,20 @@ export function App() {
         <div className="monitor-title">
           <Icon name="headphones" />
           <div>
-            <strong>{monitoring ? "耳機監聽中" : "耳機監聽已停止"}</strong>
-            <span>{audioStatus}</span>
+            <strong>
+              {consolePage
+                ? "控制台不播放音訊"
+                : monitoring
+                  ? "耳機監聽中"
+                  : "耳機監聽已停止"}
+            </strong>
+            <span>
+              {consolePage ? "請另開音源輸出頁並輸入一次性授權碼" : audioStatus}
+            </span>
           </div>
         </div>
         <button
+          hidden={consolePage}
           className={monitoring ? "" : "primary"}
           disabled={Boolean(pending.monitor) || (!connected && !monitoring)}
           onClick={() => {
@@ -901,7 +1027,7 @@ export function App() {
         >
           {pending.monitor ? "處理中…" : monitoring ? "停止監聽" : "開始監聽"}
         </button>
-        <div className="master">
+        <div className="master" hidden={consolePage}>
           <strong>耳機總音量</strong>
           <Volume
             max={100}

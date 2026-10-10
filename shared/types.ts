@@ -60,6 +60,14 @@ export interface TrackInfo {
   userId: string;
 }
 export type ServerMessage =
+  | { type: "mix"; mix: Mix }
+  | {
+      type: "opus";
+      lane: LaneId;
+      userId: string;
+      payload: string;
+      generation: number;
+    }
   | { type: "state"; state: Snapshot }
   | { type: "offer"; sdp: string; tracks: TrackInfo[]; generation: number }
   | { type: "audio-reset" }

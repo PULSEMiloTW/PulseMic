@@ -7,7 +7,7 @@ $nodeVersion = (& node -p 'process.versions.node').Split('.')
 if ([int]$nodeVersion[0] -lt 22 -or ([int]$nodeVersion[0] -eq 22 -and [int]$nodeVersion[1] -lt 12)) { throw 'Node.js 22.12+ is required.' }
 $localPort = 3210
 if ($env:PULSEMIC_PORT) { $localPort = [int]$env:PULSEMIC_PORT }
-$controlUrl = "http://localhost:$localPort"
+$controlUrl = "http://localhost:$localPort/console"
 function Test-PulseMic {
   try {
     # Probe the exact IPv4 bind; Windows can otherwise wait on localhost's IPv6 address.

@@ -1164,3 +1164,63 @@ main {
     transition: none !important;
   }
 }
+.access-page {
+  max-width: 560px;
+  margin: 8vh auto;
+  padding: 32px;
+  border-top: 4px solid #59b5e8;
+  background: #263442;
+}
+.access-page img {
+  max-width: 100%;
+  height: auto;
+}
+.access-page h1 {
+  font-size: 32px;
+  margin-top: 32px;
+}
+.access-page p {
+  line-height: 1.8;
+}
+.access-page form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+.access-page input,
+.issued-code input {
+  width: 100%;
+  min-width: 0;
+}
+.access-page a {
+  display: block;
+  margin: 24px 0;
+  color: #59b5e8;
+}
+.access-login {
+  padding: 16px;
+  border: 1px solid #59b5e8;
+  text-align: center;
+}
+.output-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 20px 0;
+  border-block: 1px solid #465867;
+}
+.output-access p {
+  margin-bottom: 0;
+}
+.issued-code {
+  flex-basis: 100%;
+  max-width: 500px;
+}
+@media (max-width: 600px) {
+  .access-page {
+    margin: 24px 16px;
+    padding: 24px;
+  }
+}

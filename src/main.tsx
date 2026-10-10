@@ -6,8 +6,11 @@ import "@fontsource/barlow/500.css";
 import "@fontsource/barlow/700.css";
 import "./style.css";
 import { App } from "./App";
+import { AccessPage } from "./AccessPage";
+const gated =
+  location.pathname === "/output" ||
+  (location.hostname === "mic.pulse-studio.live" &&
+    location.pathname !== "/console");
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <React.StrictMode>{gated ? <AccessPage /> : <App />}</React.StrictMode>,
 );

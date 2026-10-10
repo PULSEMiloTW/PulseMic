@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Lane, ServerMessage, Snapshot } from "../shared/types";
+import type { Lane, Mix, ServerMessage, Snapshot } from "../shared/types";
 import type { HeadphoneMixer } from "./audio";
 function unconfirmedLane(lane: Lane): Lane {
   return {
@@ -13,8 +13,9 @@ function unconfirmedLane(lane: Lane): Lane {
     error: "控制連線中斷，無法確認 Bot 目前所在頻道。",
   };
 }
-export function useControl(audio: HeadphoneMixer) {
+export function useControl(audio: HeadphoneMixer, outputToken?: string) {
   const [state, setState] = useState<Snapshot>();
+  const [remoteMix, setRemoteMix] = useState<Mix>();
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState("");
   const session = useRef("");
@@ -26,12 +27,21 @@ export function useControl(audio: HeadphoneMixer) {
     let retry: ReturnType<typeof setTimeout>;
     const connect = async () => {
       try {
-        const response = await fetch("/api/session", { cache: "no-store" });
-        if (!response.ok) throw new Error();
-        const body = await response.json();
+        const body = outputToken
+          ? { session: outputToken }
+          : await (async () => {
+              const response = await fetch("/api/session", {
+                cache: "no-store",
+              });
+              if (!response.ok) throw new Error();
+              return response.json();
+            })();
         if (disposed) return;
         session.current = body.session;
-        const ws = new WebSocket(`ws://${location.host}/control`, body.session);
+        const ws = new WebSocket(
+          `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/${outputToken ? "output-stream" : "control"}`,
+          body.session,
+        );
         socket.current = ws;
         ws.onopen = () => {
           if (disposed) return ws.close();
@@ -50,6 +60,9 @@ export function useControl(audio: HeadphoneMixer) {
             audio.updateState(message.state);
           }
           if (message.type === "audio-reset") audio.reset();
+          if (message.type === "mix") setRemoteMix(message.mix);
+          if (message.type === "opus")
+            audio.opus(message.lane, message.userId, message.payload);
           if (message.type === "error") setError(message.message);
           if (message.type === "offer")
             void audio.offer(
@@ -81,11 +94,13 @@ export function useControl(audio: HeadphoneMixer) {
           }
           audio.onStatus("控制服務中斷，耳機音源已停止");
           setError(
-            event.code === 4001
-              ? "另一個控制台已接手。請關閉其他控制台並重新整理。"
-              : "本機控制服務中斷，正在重新連線；耳機音源已停止。",
+            outputToken
+              ? "輸出連線已結束。請重新整理並輸入新的授權碼。"
+              : event.code === 4001
+                ? "另一個控制台已接手。請關閉其他控制台並重新整理。"
+                : "本機控制服務中斷，正在重新連線；耳機音源已停止。",
           );
-          if (event.code !== 4001)
+          if (!outputToken && event.code !== 4001 && event.code !== 4003)
             retry = setTimeout(() => {
               void connect();
             }, 2000);
@@ -94,9 +109,10 @@ export function useControl(audio: HeadphoneMixer) {
       } catch {
         if (!disposed) {
           setError("無法連接本機服務，請執行 Windows 啟動檔。");
-          retry = setTimeout(() => {
-            void connect();
-          }, 2000);
+          if (!outputToken)
+            retry = setTimeout(() => {
+              void connect();
+            }, 2000);
         }
       }
     };
@@ -107,7 +123,7 @@ export function useControl(audio: HeadphoneMixer) {
       socket.current?.close();
       audio.reset();
     };
-  }, [audio]);
+  }, [audio, outputToken]);
   const request = useCallback(async (path: string, body: unknown) => {
     if (socket.current?.readyState !== WebSocket.OPEN)
       throw new Error("本機服務尚未連線，請等待恢復。");
@@ -126,13 +142,29 @@ export function useControl(audio: HeadphoneMixer) {
     async (enabled: boolean) => {
       if (enabled && socket.current?.readyState !== WebSocket.OPEN)
         throw new Error("請等待本機控制服務連線後再開始監聽。");
+      if (
+        enabled &&
+        outputToken &&
+        location.hostname !== "localhost" && location.hostname !== "127.0.0.1" &&
+        (typeof AudioDecoder === "undefined" ||
+          !(
+            await AudioDecoder.isConfigSupported({
+              codec: "opus",
+              sampleRate: 48000,
+              numberOfChannels: 2,
+            })
+          ).supported)
+      )
+        throw new Error(
+          "這個瀏覽器不支援獨立音源解碼。請使用最新版 Chrome 或 Edge。",
+        );
       if (enabled) await audio.start();
       else await audio.stop();
       monitoring.current = enabled;
       if (socket.current?.readyState === WebSocket.OPEN)
         socket.current.send(JSON.stringify({ type: "monitor", enabled }));
     },
-    [audio],
+    [audio, outputToken],
   );
-  return { state, connected, error, setError, request, monitor };
+  return { state, connected, error, setError, request, monitor, remoteMix };
 }

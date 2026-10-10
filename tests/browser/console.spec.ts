@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 test("desktop console: explicit demo, independent source choices, duplicate handover, mix persistence", async ({
   page,
+  request,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -32,31 +33,52 @@ test("desktop console: explicit demo, independent source choices, duplicate hand
   await expect(
     laneB.getByText("同頻道備援 · 由 A 路播放一份音訊"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "開始監聽", exact: true }).click();
-  await page.getByRole("button", { name: "播放示範測試音" }).click();
+  const session = (await (await request.get("/api/session")).json()).session;
+  const code = (
+    await (
+      await request.post("/api/output-code", {
+        headers: {
+          "X-PulseMic-Session": session,
+          Origin: "http://localhost:3211",
+        },
+        data: {},
+      })
+    ).json()
+  ).code;
+  const output = await page.context().newPage();
+  await output.goto("/output");
+  await output.getByLabel("一次性授權碼").fill(code);
+  await output.getByRole("button", { name: "驗證並進入" }).click();
+  await expect(
+    output.getByText("本機服務已連線", { exact: true }),
+  ).toBeVisible();
+  const outputA = output.locator(".lane-a").first();
+  const outputB = output.locator(".lane-b").first();
+  await output.getByRole("button", { name: "開始監聽", exact: true }).click();
+  await output.getByRole("button", { name: "播放示範測試音" }).click();
   await expect
     .poll(async () =>
-      laneA.locator(".meter").first().getAttribute("data-active"),
+      outputA.locator(".meter").first().getAttribute("data-active"),
     )
     .toBe("true");
   expect(
-    await laneB.locator(".meter").first().getAttribute("data-active"),
+    await outputB.locator(".meter").first().getAttribute("data-active"),
   ).not.toBe("true");
-  const member = laneA.getByRole("slider", {
+  const member = outputA.getByRole("slider", {
     name: "A 路 隊長 demo-B-0 音量",
     exact: true,
   });
   await member.fill("150");
   await expect(member).toHaveValue("150");
-  await laneA
+  await outputA
     .getByRole("button", { name: "靜音 A 路 隊長 demo-B-0", exact: true })
     .click();
   await expect
     .poll(async () =>
-      laneA.locator(".meter").first().getAttribute("data-active"),
+      outputA.locator(".meter").first().getAttribute("data-active"),
     )
     .toBe("false");
-  await laneA
+  await outputA
     .getByRole("button", { name: "取消靜音 A 路 隊長 demo-B-0", exact: true })
     .click();
   await mkdir(resolve(".local/qa"), { recursive: true });
@@ -75,19 +97,21 @@ test("desktop console: explicit demo, independent source choices, duplicate hand
   await expect(laneB.getByText("由 B 路播放 · 獨立成員音源")).toBeVisible();
   await expect
     .poll(async () =>
-      laneB.locator(".meter").first().getAttribute("data-active"),
+      outputB.locator(".meter").first().getAttribute("data-active"),
     )
     .toBe("true");
-  await page.getByRole("button", { name: "停止監聽", exact: true }).click();
+  await output.getByRole("button", { name: "停止監聽", exact: true }).click();
   await expect(laneB.getByText("正在收聽", { exact: true })).toBeVisible();
   await page.waitForTimeout(250);
   await page.reload();
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
   await laneA.getByRole("button", { name: "開啟語音", exact: true }).click();
-  await expect(member).toHaveValue("150");
+  await expect(
+    laneA.getByRole("slider", { name: "A 路 隊長 demo-B-0 音量", exact: true }),
+  ).toHaveValue("150");
   await expect(
     page.getByRole("button", { name: "開始監聽", exact: true }),
-  ).toBeVisible();
+  ).toBeHidden();
   expect(errors).toEqual([]);
 });
 

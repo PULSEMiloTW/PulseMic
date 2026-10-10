@@ -13,6 +13,16 @@ export class HeadphoneMixer {
   private lanes = new Map<LaneId, GainNode>();
   private inputs = new Map<string, Input>();
   private peer?: RTCPeerConnection;
+  private decoders = new Map<
+    string,
+    {
+      decoder: AudioDecoder;
+      timestamp: number;
+      next: number;
+      bus: GainNode;
+      playing: Set<AudioBufferSourceNode>;
+    }
+  >();
   private generation = 0;
   private meters = new Map<string, HTMLElement>();
   private raf = 0;
@@ -60,6 +70,14 @@ export class HeadphoneMixer {
     this.generation++;
     this.peer?.close();
     this.peer = undefined;
+    for (const item of this.decoders.values()) {
+      if (item.decoder.state !== "closed") item.decoder.close();
+      for (const source of item.playing) {
+        source.stop();
+        source.disconnect();
+      }
+    }
+    this.decoders.clear();
     for (const input of this.inputs.values()) {
       input.stop();
       input.source.disconnect();
@@ -93,6 +111,89 @@ export class HeadphoneMixer {
   updateState(state: Snapshot) {
     this.state = state;
     this.syncDemo();
+  }
+  opus(lane: LaneId, userId: string, payload: string) {
+    if (
+      !this.active ||
+      !this.context ||
+      !this.state ||
+      this.state.mode !== "live"
+    )
+      return;
+    const laneState = this.state.lanes[lane];
+    if (
+      laneState.status !== "listening" ||
+      laneState.playbackLane !== lane ||
+      !laneState.members.some((member) => member.id === userId)
+    )
+      return;
+    const key = `${lane}:${userId}`;
+    let item = this.decoders.get(key);
+    if (!item) {
+      const context = this.context;
+      const generation = this.generation;
+      const bus = context.createGain();
+      const playing = new Set<AudioBufferSourceNode>();
+      const decoder = new AudioDecoder({
+        output: (data) => {
+          try {
+            const current = this.decoders.get(key);
+            if (!current || generation !== this.generation) return;
+            if (current.next > context.currentTime + 0.25) return;
+            const buffer = context.createBuffer(
+              data.numberOfChannels,
+              data.numberOfFrames,
+              data.sampleRate,
+            );
+            for (let channel = 0; channel < data.numberOfChannels; channel++)
+              data.copyTo(buffer.getChannelData(channel), {
+                planeIndex: channel,
+                format: "f32-planar",
+              });
+            const source = context.createBufferSource();
+            source.buffer = buffer;
+            source.connect(bus);
+            playing.add(source);
+            source.onended = () => {
+              playing.delete(source);
+              source.disconnect();
+            };
+            const at = Math.max(current.next, context.currentTime + 0.04);
+            source.start(at);
+            current.next = at + buffer.duration;
+            this.onStatus("遠端獨立音源播放中");
+          } finally {
+            data.close();
+          }
+        },
+        error: () => {
+          this.reset();
+          this.onStatus("音訊解碼失敗，請停止並重新開始播放");
+        },
+      });
+      decoder.configure({
+        codec: "opus",
+        sampleRate: 48000,
+        numberOfChannels: 2,
+      });
+      item = { decoder, bus, playing, timestamp: 0, next: 0 };
+      this.decoders.set(key, item);
+      this.attach(lane, userId, bus, () => {});
+    }
+    if (
+      item.decoder.state !== "configured" ||
+      item.decoder.decodeQueueSize > 12
+    )
+      return;
+    const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
+    item.decoder.decode(
+      new EncodedAudioChunk({
+        type: "key",
+        timestamp: item.timestamp,
+        data: bytes,
+      }),
+    );
+    item.timestamp += 20000;
   }
   toggleTone(enabled: boolean) {
     this.testTone = enabled;
