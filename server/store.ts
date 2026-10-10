@@ -95,14 +95,12 @@ export class WindowsSettingsStore implements SettingsStore {
   private pending: Promise<void> = Promise.resolve();
   constructor(
     readonly directory = join(process.env.LOCALAPPDATA ?? ".", "PulseMic"),
+    private filename = "credentials.secrets",
   ) {}
   async load() {
     let encrypted: string;
     try {
-      encrypted = await readFile(
-        join(this.directory, "credentials.secrets"),
-        "utf8",
-      );
+      encrypted = await readFile(join(this.directory, this.filename), "utf8");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT")
         return emptySettings();
@@ -120,7 +118,7 @@ export class WindowsSettingsStore implements SettingsStore {
       await mkdir(this.directory, { recursive: true });
       const temporary = join(this.directory, `${randomUUID()}.secrets`);
       await writeFile(temporary, encrypted, { mode: 0o600 });
-      await rename(temporary, join(this.directory, "credentials.secrets"));
+      await rename(temporary, join(this.directory, this.filename));
     });
     this.pending = operation.catch(() => {});
     return operation;

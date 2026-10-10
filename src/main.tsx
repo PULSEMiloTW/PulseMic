@@ -9,6 +9,7 @@ import { App } from "./App";
 import { AccessPage } from "./AccessPage";
 const gated =
   location.pathname === "/output" ||
+  location.pathname === "/caster-output" ||
   (location.hostname === "mic.pulse-studio.live" &&
     location.pathname !== "/console");
 createRoot(document.getElementById("root")!).render(

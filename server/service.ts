@@ -60,16 +60,21 @@ export class ControlService extends EventEmitter {
     private store: SettingsStore,
     private factory: () => VoiceDriver = () => new DiscordDriver(),
     private retryDelays = [1000, 3000, 7000],
+    private activeIds: readonly LaneId[] = ids,
   ) {
     super();
+    if (activeIds.length === 1) {
+      this.state.lanes.A.botName = "PulseMic Caster Desk";
+      this.state.notice = "請先設定並驗證主播台 Bot 憑證。";
+    }
   }
   async start() {
     try {
       this.settings = await this.store.load();
-      for (const id of ids)
+      for (const id of this.activeIds)
         this.state.lanes[id].selectedSource = this.settings.selected[id];
       this.state.settings = publicSettings(this.settings);
-      if (this.settings.tokens.A && this.settings.tokens.B)
+      if (this.activeIds.every((id) => this.settings.tokens[id]))
         await this.validate();
     } catch (error) {
       this.state.notice = this.safeError(
@@ -89,6 +94,11 @@ export class ControlService extends EventEmitter {
       ? message
       : fallback;
   }
+  private botLabel(id: LaneId) {
+    return this.activeIds.length === 1
+      ? "PulseMic Caster Desk"
+      : `機器人 ${id}`;
+  }
   private clearLane(id: LaneId) {
     const lane = this.state.lanes[id];
     lane.channelId = null;
@@ -98,7 +108,8 @@ export class ControlService extends EventEmitter {
   }
   publish() {
     const owners = playbackOwners(this.state.lanes);
-    for (const id of ids) this.state.lanes[id].playbackLane = owners[id];
+    for (const id of this.activeIds)
+      this.state.lanes[id].playbackLane = owners[id];
     this.state.revision++;
     const signature = JSON.stringify(
       ids.map((id) => {
@@ -127,7 +138,7 @@ export class ControlService extends EventEmitter {
         channelId: this.driver.metadata.channels[source].id,
         name: this.driver.metadata.channels[source].name,
       };
-    for (const id of ids) {
+    for (const id of this.activeIds) {
       const lane = this.state.lanes[id];
       if (lane.status === "listening") {
         const channel = this.driver.metadata.channels[lane.selectedSource];
@@ -184,7 +195,7 @@ export class ControlService extends EventEmitter {
   private assertAvailable() {
     if (
       this.busy ||
-      ids.some((id) =>
+      this.activeIds.some((id) =>
         ["connecting", "disconnecting", "reconnecting"].includes(
           this.state.lanes[id].status,
         ),
@@ -196,7 +207,7 @@ export class ControlService extends EventEmitter {
     this.assertAvailable();
     this.busy = true;
     let next: VoiceDriver | undefined;
-    this.state.notice = "正在驗證伺服器、兩個 Bot 與語音頻道權限…";
+    this.state.notice = "正在驗證伺服器、Bot 與語音頻道權限…";
     this.publish();
     try {
       const parsed = input ? settingsSchema.parse(input) : this.settings;
@@ -208,15 +219,22 @@ export class ControlService extends EventEmitter {
         },
         selected: { ...this.settings.selected },
       };
-      if (!candidate.tokens.A || !candidate.tokens.B)
-        throw new ControlError("請輸入兩個 Bot Token。");
-      if (candidate.tokens.A === candidate.tokens.B)
+      if (this.activeIds.some((id) => !candidate.tokens[id]))
+        throw new ControlError(
+          this.activeIds.length === 1
+            ? "請輸入主播台 Bot Token。"
+            : "請輸入兩個 Bot Token。",
+        );
+      if (
+        this.activeIds.length > 1 &&
+        candidate.tokens.A === candidate.tokens.B
+      )
         throw new ControlError("兩個 Bot Token 必須對應不同的 Bot。");
       if (
         this.state.mode === "live" &&
-        ids.some((id) => this.state.lanes[id].status === "listening")
+        this.activeIds.some((id) => this.state.lanes[id].status === "listening")
       )
-        throw new ControlError("請先關閉兩路語音，再變更或重新驗證設定。");
+        throw new ControlError("請先關閉語音，再變更或重新驗證設定。");
       next = this.factory();
       await next.initialize(candidate);
       await this.store.save(candidate);
@@ -227,7 +245,7 @@ export class ControlService extends EventEmitter {
       this.state.mode = "live";
       this.state.validated = true;
       this.state.settings = publicSettings(candidate);
-      for (const id of ids) {
+      for (const id of this.activeIds) {
         this.clearLane(id);
         Object.assign(this.state.lanes[id], {
           status: "idle",
@@ -265,21 +283,24 @@ export class ControlService extends EventEmitter {
       A: { id: "A", channelId: "", name: "" },
       B: { id: "B", channelId: "", name: "" },
     };
-    for (const id of ids) {
+    for (const id of this.activeIds) {
       this.clearLane(id);
       Object.assign(this.state.lanes[id], {
         status: "idle",
         error: null,
         targetName: null,
         botOnline: false,
-        botName: `PulseMic ${id}`,
+        botName:
+          this.activeIds.length === 1
+            ? "PulseMic Caster Desk"
+            : `PulseMic ${id}`,
       });
     }
     if (mode === "demo") {
-      this.driver = new DemoDriver();
+      this.driver = new DemoDriver(this.activeIds.length === 1);
       this.bind(this.driver);
       this.state.validated = true;
-      for (const id of ids) this.state.lanes[id].botOnline = true;
+      for (const id of this.activeIds) this.state.lanes[id].botOnline = true;
       this.refresh();
       this.state.notice =
         "示範模式：虛構成員與本機測試音，不代表 Discord 收音。";
@@ -291,6 +312,11 @@ export class ControlService extends EventEmitter {
     action: "open" | "close" | "switch",
     source?: SourceId,
   ) {
+    if (
+      !this.activeIds.includes(id) ||
+      (this.activeIds.length === 1 && source === "B")
+    )
+      throw new ControlError("主播台只能使用自己的語音來源。");
     if (this.busy || this.retrying.has(id))
       throw new ControlError("操作處理中，請等待後端確認。");
     const lane = this.state.lanes[id];
@@ -306,7 +332,7 @@ export class ControlService extends EventEmitter {
       lane.status = "idle";
       lane.targetName = null;
       lane.error = null;
-      this.state.notice = `機器人 ${id} 已退出語音，保留 Discord 在線。`;
+      this.state.notice = `${this.botLabel(id)} 已退出語音，保留 Discord 在線。`;
       this.publish();
       return;
     }
@@ -335,7 +361,7 @@ export class ControlService extends EventEmitter {
       lane.channelName = this.state.sources[selected].name;
       lane.targetName = null;
       lane.members = this.driver.members(id);
-      this.state.notice = `機器人 ${id} 已加入 ${lane.channelName}。`;
+      this.state.notice = `${this.botLabel(id)} 已加入 ${lane.channelName}。`;
       this.publish();
     } catch (error) {
       this.fail(
@@ -354,7 +380,7 @@ export class ControlService extends EventEmitter {
       error: reason,
       targetName: null,
     });
-    this.state.notice = `機器人 ${id}：${reason}`;
+    this.state.notice = `${this.botLabel(id)}：${reason}`;
     this.publish();
   }
   private async recover(id: LaneId) {
@@ -389,7 +415,7 @@ export class ControlService extends EventEmitter {
           lane.targetName = null;
           lane.error = null;
           lane.members = this.driver.members(id);
-          this.state.notice = `機器人 ${id} 語音連線已恢復。`;
+          this.state.notice = `${this.botLabel(id)} 語音連線已恢復。`;
           this.publish();
           return;
         } catch {

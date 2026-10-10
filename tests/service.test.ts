@@ -56,6 +56,62 @@ class FakeDriver implements VoiceDriver {
     this.joined.clear();
   }
 }
+test("caster validates a single identity, starts idle and rejects player source commands", async () => {
+  const saved: SavedSettings = {
+    ...settings,
+    tokens: { A: "synthetic-caster", B: "" },
+    selected: { A: "A", B: "B" },
+  };
+  const driver = new FakeDriver();
+  const caster = new ControlService(
+    { load: async () => saved, save: async () => {} },
+    () => driver,
+    [0],
+    ["A"],
+  );
+  await caster.start();
+  assert.equal(caster.state.validated, true);
+  assert.equal(caster.state.lanes.A.status, "idle");
+  assert.equal(caster.state.lanes.B.botOnline, false);
+  assert.equal(
+    JSON.stringify(caster.state).includes("synthetic-caster"),
+    false,
+  );
+  await assert.rejects(caster.command("B", "open"), /主播台/);
+  await assert.rejects(caster.command("A", "switch", "B"), /主播台/);
+  await caster.command("A", "open");
+  assert.equal(caster.state.lanes.A.channelName, "藍隊選手語音");
+  driver.metadata.channels.A.name = "實際主播台頻道";
+  driver.events?.change();
+  assert.equal(caster.state.lanes.A.channelName, "實際主播台頻道");
+  await caster.command("A", "close");
+  assert.equal(caster.state.lanes.A.channelName, null);
+  assert.equal(caster.state.lanes.A.botOnline, true);
+  caster.close();
+});
+
+test("caster demo has its own identity and member IDs and leaves player service untouched", async () => {
+  const players = await fixture();
+  const caster = new ControlService(
+    { load: async () => emptySettings(), save: async () => {} },
+    undefined,
+    [0],
+    ["A"],
+  );
+  await caster.mode("demo");
+  await caster.command("A", "open");
+  assert.equal(caster.state.lanes.A.channelName, "主播台語音（示範）");
+  assert.equal(caster.state.lanes.B.botOnline, false);
+  assert.ok(
+    caster.state.lanes.A.members.every((member) =>
+      member.id.startsWith("demo-caster-"),
+    ),
+  );
+  assert.equal(players.service.state.mode, "live");
+  assert.equal(players.service.state.lanes.A.status, "idle");
+  caster.close();
+  players.service.close();
+});
 async function fixture(delays = [0]) {
   const driver = new FakeDriver();
   let saved = structuredClone(settings);

@@ -9,7 +9,10 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run start",
+    command:
+      process.env.PULSEMIC_TEST_PREVIEW === "1"
+        ? "node .local/preview/dist/server/server/index.js"
+        : "npm run start",
     url: "http://localhost:3211/api/health",
     env: {
       PULSEMIC_PORT: "3211",

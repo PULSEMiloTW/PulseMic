@@ -10,6 +10,11 @@ type Input = {
 export class HeadphoneMixer {
   private context?: AudioContext;
   private master?: GainNode;
+  private emergencyMuted = false;
+  emergencyMute(muted: boolean) {
+    this.emergencyMuted = muted;
+    if (this.mix) this.updateMix(this.mix);
+  }
   private lanes = new Map<LaneId, GainNode>();
   private inputs = new Map<string, Input>();
   private peer?: RTCPeerConnection;
@@ -92,7 +97,7 @@ export class HeadphoneMixer {
     this.mix = mix;
     const now = this.context?.currentTime ?? 0;
     this.master?.gain.setTargetAtTime(
-      this.active && !mix.muted ? mix.master / 100 : 0,
+      this.active && !mix.muted && !this.emergencyMuted ? mix.master / 100 : 0,
       now,
       0.015,
     );

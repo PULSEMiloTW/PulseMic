@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { App } from "./App";
 
 export function AccessPage() {
-  const output = location.pathname === "/output";
+  const caster = location.pathname === "/caster-output";
+  const output = location.pathname === "/output" || caster;
   const [token, setToken] = useState("");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,7 +32,10 @@ export function AccessPage() {
       const response = await fetch("/auth/output", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: new FormData(form).get("code") }),
+        body: JSON.stringify({
+          code: new FormData(form).get("code"),
+          kind: caster ? "caster" : "players",
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "授權驗證失敗，請重試。");
@@ -45,7 +49,10 @@ export function AccessPage() {
       setBusy(false);
     }
   }
-  if (token) return <App outputToken={token} />;
+  if (token)
+    return (
+      <App outputToken={token} outputKind={caster ? "caster" : "players"} />
+    );
   return (
     <main className="access-page">
       <img
@@ -54,10 +61,12 @@ export function AccessPage() {
         height="96"
         alt="PulseMic"
       />
-      <h1>{output ? "音源輸出" : "導播登入"}</h1>
+      <h1>
+        {caster ? "Caster Desk 主播台輸出" : output ? "音源輸出" : "導播登入"}
+      </h1>
       <p>
         {output
-          ? "輸入導播提供的一次性授權碼，開啟本次音源輸出。"
+          ? "輸入這個輸出頁專用的一次性授權碼，開啟本次音源輸出。"
           : "以指定的 Discord 帳號登入，進入賽事語音控制台。"}
       </p>
       {output ? (
@@ -90,7 +99,8 @@ export function AccessPage() {
           ) : (
             <p role="status">Discord 登入尚待本機設定完成。</p>
           )}
-          <a href="/output">前往音源輸出頁</a>
+          <a href="/output">前往選手音源輸出頁</a>
+          <a href="/caster-output">前往主播台音源輸出頁</a>
         </>
       )}
       {error ? (

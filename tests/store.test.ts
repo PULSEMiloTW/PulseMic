@@ -13,6 +13,41 @@ import { validHost, validOrigin, validSession } from "../server/security.js";
 import { opusSamples } from "../server/media.js";
 import { laneGain, defaultMix } from "../src/mix.js";
 test(
+  "Windows caster credentials are encrypted separately from player credentials",
+  { skip: process.platform !== "win32" },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "pulsemic-caster-test-"));
+    try {
+      const players = new WindowsSettingsStore(directory);
+      const caster = new WindowsSettingsStore(directory, "caster.secrets");
+      const playerSettings = {
+        ...emptySettings(),
+        guildId: "123456789012345678",
+        channels: { A: "223456789012345678", B: "323456789012345678" },
+        tokens: { A: "synthetic-player-a", B: "synthetic-player-b" },
+      };
+      const casterSettings = {
+        ...playerSettings,
+        tokens: { A: "synthetic-caster", B: "" },
+      };
+      await Promise.all([
+        players.save(playerSettings),
+        caster.save(casterSettings),
+      ]);
+      assert.deepEqual(await players.load(), playerSettings);
+      assert.deepEqual(await caster.load(), casterSettings);
+      assert.equal(
+        (await readFile(join(directory, "caster.secrets"), "utf8")).includes(
+          "synthetic",
+        ),
+        false,
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+test(
   "Windows DPAPI saves encrypted credentials and reloads selected sources",
   { skip: process.platform !== "win32" },
   async () => {

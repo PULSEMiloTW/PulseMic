@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
+import { DiscordDriver } from "./driver.js";
 import { ControlService } from "./service.js";
 import { WindowsSettingsStore, dpapi } from "./store.js";
 import { readFile } from "node:fs/promises";
@@ -28,7 +29,16 @@ const app = express();
 app.disable("x-powered-by");
 const server = createServer(app);
 const session = randomBytes(32).toString("hex");
-const service = new ControlService(new WindowsSettingsStore());
+const service: ControlService = new ControlService(
+  new WindowsSettingsStore(),
+  () => new DiscordDriver(["A", "B"], "PulseMic"),
+);
+const caster: ControlService = new ControlService(
+  new WindowsSettingsStore(undefined, "caster.secrets"),
+  () => new DiscordDriver(["A"], "PulseMic-Caster"),
+  undefined,
+  ["A"],
+);
 try {
   const encrypted = await readFile(
     join(process.env.LOCALAPPDATA ?? ".", "PulseMic", "oauth.secrets"),
@@ -54,6 +64,8 @@ try {
 }
 const access = new Access();
 let outputMix: Mix | undefined;
+let casterMix: Mix | undefined;
+let panicMuted = false;
 const publicOrigin = "https://mic.pulse-studio.live";
 const publicHost = "mic.pulse-studio.live";
 const allowedUser = "1456945476933914626";
@@ -118,7 +130,7 @@ app.get("/api/access", (_, res) => {
   res.json({
     loginReady: Boolean(
       process.env.PULSEMIC_DISCORD_CLIENT_ID &&
-      process.env.PULSEMIC_DISCORD_CLIENT_SECRET,
+        process.env.PULSEMIC_DISCORD_CLIENT_SECRET,
     ),
   });
 });
@@ -126,7 +138,10 @@ app.post("/auth/output", rateLimit, (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!originAllowed(req.headers.origin, req.headers.host))
     return void res.status(403).end();
-  const token = access.redeem(z.string().max(100).parse(req.body.code));
+  const token = access.redeem(
+    z.string().max(100).parse(req.body.code),
+    z.enum(["players", "caster"]).default("players").parse(req.body.kind),
+  );
   if (!token)
     return void res
       .status(403)
@@ -262,24 +277,40 @@ app.use("/api", (req, res, next) => {
     return void res.status(403).end();
   next();
 });
-app.post("/api/output-code", (_, res) => res.json(access.issueCode()));
+app.post("/api/output-code", (req, res) =>
+  res.json(
+    access.issueCode(
+      z.enum(["players", "caster"]).default("players").parse(req.body.kind),
+    ),
+  ),
+);
+app.post("/api/panic", (req, res) => {
+  panicMuted = z.boolean().parse(req.body.muted);
+  service.emit("panic", panicMuted);
+  caster.emit("panic", panicMuted);
+  res.json({ ok: true });
+});
 const memberMix = z.object({
   volume: z.number().min(0).max(200),
   muted: z.boolean(),
 });
+const mixSchema = z.object({
+  master: z.number().min(0).max(100),
+  muted: z.boolean(),
+  solo: z.enum(["A", "B"]).nullable(),
+  lanes: z.object({ A: memberMix, B: memberMix }),
+  members: z
+    .record(z.string().max(100), memberMix)
+    .refine((value) => Object.keys(value).length <= 2000),
+});
 app.post("/api/mix", (req, res) => {
-  outputMix = z
-    .object({
-      master: z.number().min(0).max(100),
-      muted: z.boolean(),
-      solo: z.enum(["A", "B"]).nullable(),
-      lanes: z.object({ A: memberMix, B: memberMix }),
-      members: z
-        .record(z.string().max(100), memberMix)
-        .refine((value) => Object.keys(value).length <= 2000),
-    })
-    .parse(req.body);
+  outputMix = mixSchema.parse(req.body);
   service.emit("mix", outputMix);
+  res.json({ ok: true });
+});
+app.post("/api/caster/mix", (req, res) => {
+  casterMix = mixSchema.refine((mix) => mix.solo !== "B").parse(req.body);
+  caster.emit("mix", casterMix);
   res.json({ ok: true });
 });
 app.get("/api/state", (_, res) => res.json(service.state));
@@ -307,6 +338,36 @@ app.post("/api/mode", async (req, res) => {
   await service.mode(z.enum(["live", "demo"]).parse(req.body.mode));
   res.json({ ok: true });
 });
+app.get("/api/caster/state", (_, res) => res.json(caster.state));
+app.post("/api/caster/bot", async (req, res) => {
+  await caster.command("A", z.enum(["open", "close"]).parse(req.body.action));
+  res.json({ ok: true });
+});
+app.post("/api/caster/settings", async (req, res) => {
+  if (!local(req.headers.host))
+    return void res.status(403).json({ error: "Bot 憑證只能在本機設定。" });
+  const input = z
+    .object({
+      guildId: z.string().regex(/^\d{17,20}$/),
+      channelId: z.string().regex(/^\d{17,20}$/),
+      token: z.string().trim().max(256),
+    })
+    .parse(req.body);
+  await caster.validate({
+    guildId: input.guildId,
+    channels: { A: input.channelId, B: input.channelId },
+    tokens: { A: input.token, B: "" },
+  });
+  res.json({ ok: true });
+});
+app.post("/api/caster/validate", async (_, res) => {
+  await caster.validate();
+  res.json({ ok: true });
+});
+app.post("/api/caster/mode", async (req, res) => {
+  await caster.mode(z.enum(["live", "demo"]).parse(req.body.mode));
+  res.json({ ok: true });
+});
 app.use("/api", (_, res) =>
   res.status(404).json({ error: "找不到本機操作。" }),
 );
@@ -328,7 +389,10 @@ if (dev) {
       !controllerAllowed(req)
     )
       return void res.redirect("/");
-    res.sendFile(resolve(root, "dist/client/index.html"));
+    // The fixed index can live under the ignored .local preview directory.
+    res.sendFile(resolve(root, "dist/client/index.html"), {
+      dotfiles: "allow",
+    });
   });
 }
 app.use(
@@ -352,12 +416,20 @@ let controller: WebSocket | undefined;
 server.on("upgrade", (req, socket, head) => {
   const token = req.headers["sec-websocket-protocol"] ?? "";
   if (
-    req.url === "/output-stream" &&
+    (req.url === "/output-stream" || req.url === "/caster-output-stream") &&
     originAllowed(req.headers.origin, req.headers.host) &&
-    access.claimOutput(token)
+    access.claimOutput(
+      token,
+      req.url === "/caster-output-stream" ? "caster" : "players",
+    )
   ) {
     wss.handleUpgrade(req, socket, head, (ws) =>
-      wss.emit("connection", ws, { output: true, token, public: !local(req.headers.host) }),
+      wss.emit("connection", ws, {
+        output: true,
+        caster: req.url === "/caster-output-stream",
+        token,
+        public: !local(req.headers.host),
+      }),
     );
     return;
   }
@@ -384,21 +456,42 @@ wss.on(
   "connection",
   (
     socket: WebSocket,
-    context: { output: boolean; token: string; public?: boolean },
+    context: {
+      output: boolean;
+      caster?: boolean;
+      token: string;
+      public?: boolean;
+    },
   ) => {
     if (!context.output) {
       controller?.close(4001, "另一個控制台已接手");
       controller = socket;
     }
-    const media = context.output && context.public
-      ? new OpusOutput(socket, service)
-      : new MediaSession(socket, service);
-    const state = () => media.send({ type: "state", state: service.state });
+    const source = context.caster ? caster : service;
+    const media =
+      context.output && context.public
+        ? new OpusOutput(socket, source)
+        : new MediaSession(socket, source);
+    const state = () => media.send({ type: "state", state: source.state });
+    const casterState = () =>
+      media.send({ type: "caster-state", state: caster.state });
+    const casterMixEvent = (value: Mix) =>
+      media.send({ type: "caster-mix", mix: value });
     state();
+    const panic = (muted: boolean) => media.send({ type: "panic", muted });
+    panic(panicMuted);
+    source.on("panic", panic);
     const mix = (value: Mix) => media.send({ type: "mix", mix: value });
-    if (outputMix) mix(outputMix);
-    service.on("mix", mix);
-    service.on("state", state);
+    const currentMix = context.caster ? casterMix : outputMix;
+    if (currentMix) mix(currentMix);
+    source.on("mix", mix);
+    source.on("state", state);
+    if (!context.output) {
+      casterState();
+      if (casterMix) casterMixEvent(casterMix);
+      caster.on("state", casterState);
+      caster.on("mix", casterMixEvent);
+    }
     let alive = true;
     socket.on("pong", () => {
       alive = true;
@@ -429,7 +522,12 @@ wss.on(
             }),
           ])
           .parse(JSON.parse(raw.toString()));
-        if (context.public && !context.output && message.type === "monitor" && message.enabled)
+        if (
+          context.public &&
+          !context.output &&
+          message.type === "monitor" &&
+          message.enabled
+        )
           throw new Error("Use output page");
         if (message.type === "monitor") await media.monitor(message.enabled);
         else await media.answer(message.sdp, message.generation);
@@ -445,8 +543,11 @@ wss.on(
       clearInterval(heartbeat);
       media.close();
       if (context.output) access.revokeOutput(context.token);
-      service.off("state", state);
-      service.off("mix", mix);
+      source.off("panic", panic);
+      source.off("state", state);
+      source.off("mix", mix);
+      caster.off("state", casterState);
+      caster.off("mix", casterMixEvent);
       if (controller === socket) controller = undefined;
     });
   },
@@ -455,13 +556,16 @@ server.on("error", () => {
   console.error("PulseMic 無法啟動：請檢查本機連接埠是否已被使用。");
   process.exitCode = 1;
   service.close();
+  caster.close();
 });
 server.listen(port, "127.0.0.1", () => {
   console.log(`PulseMic 控制台 http://localhost:${port}（只供本機）`);
   void service.start();
+  void caster.start();
 });
 function shutdown() {
   service.close();
+  caster.close();
   for (const client of wss.clients) client.close();
   wss.close();
   server.close(() => process.exit(0));

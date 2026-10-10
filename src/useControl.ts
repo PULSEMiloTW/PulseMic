@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Lane, Mix, ServerMessage, Snapshot } from "../shared/types";
+import type {
+  Lane,
+  Mix,
+  ServerMessage,
+  Snapshot,
+  OutputKind,
+} from "../shared/types";
 import type { HeadphoneMixer } from "./audio";
 function unconfirmedLane(lane: Lane): Lane {
   return {
@@ -13,8 +19,15 @@ function unconfirmedLane(lane: Lane): Lane {
     error: "控制連線中斷，無法確認 Bot 目前所在頻道。",
   };
 }
-export function useControl(audio: HeadphoneMixer, outputToken?: string) {
+export function useControl(
+  audio: HeadphoneMixer,
+  outputToken?: string,
+  outputKind: OutputKind = "players",
+) {
   const [state, setState] = useState<Snapshot>();
+  const [panicMuted, setPanicMuted] = useState(false);
+  const [casterState, setCasterState] = useState<Snapshot>();
+  const [remoteCasterMix, setRemoteCasterMix] = useState<Mix>();
   const [remoteMix, setRemoteMix] = useState<Mix>();
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState("");
@@ -39,7 +52,7 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
         if (disposed) return;
         session.current = body.session;
         const ws = new WebSocket(
-          `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/${outputToken ? "output-stream" : "control"}`,
+          `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/${outputToken ? (outputKind === "caster" ? "caster-output-stream" : "output-stream") : "control"}`,
           body.session,
         );
         socket.current = ws;
@@ -59,6 +72,12 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
             setState(message.state);
             audio.updateState(message.state);
           }
+          if (message.type === "panic") {
+            setPanicMuted(message.muted);
+            audio.emergencyMute(message.muted);
+          }
+          if (message.type === "caster-state") setCasterState(message.state);
+          if (message.type === "caster-mix") setRemoteCasterMix(message.mix);
           if (message.type === "audio-reset") audio.reset();
           if (message.type === "mix") setRemoteMix(message.mix);
           if (message.type === "opus")
@@ -79,6 +98,17 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
           if (disposed) return;
           setConnected(false);
           audio.reset();
+          setCasterState((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  lanes: {
+                    A: unconfirmedLane(previous.lanes.A),
+                    B: unconfirmedLane(previous.lanes.B),
+                  },
+                }
+              : previous,
+          );
           const previous = latestState.current;
           if (previous) {
             const next: Snapshot = {
@@ -123,7 +153,7 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
       socket.current?.close();
       audio.reset();
     };
-  }, [audio, outputToken]);
+  }, [audio, outputToken, outputKind]);
   const request = useCallback(async (path: string, body: unknown) => {
     if (socket.current?.readyState !== WebSocket.OPEN)
       throw new Error("本機服務尚未連線，請等待恢復。");
@@ -137,6 +167,7 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? "操作失敗，請重試。");
+    return result;
   }, []);
   const monitor = useCallback(
     async (enabled: boolean) => {
@@ -145,7 +176,8 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
       if (
         enabled &&
         outputToken &&
-        location.hostname !== "localhost" && location.hostname !== "127.0.0.1" &&
+        location.hostname !== "localhost" &&
+        location.hostname !== "127.0.0.1" &&
         (typeof AudioDecoder === "undefined" ||
           !(
             await AudioDecoder.isConfigSupported({
@@ -166,5 +198,16 @@ export function useControl(audio: HeadphoneMixer, outputToken?: string) {
     },
     [audio, outputToken],
   );
-  return { state, connected, error, setError, request, monitor, remoteMix };
+  return {
+    state,
+    connected,
+    error,
+    setError,
+    request,
+    monitor,
+    remoteMix,
+    casterState,
+    remoteCasterMix,
+    panicMuted,
+  };
 }

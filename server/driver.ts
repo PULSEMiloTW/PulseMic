@@ -16,6 +16,7 @@ import {
 import type { LaneId, Member, SourceId } from "../shared/types.js";
 import type { SavedSettings } from "./store.js";
 import { ControlError } from "./errors.js";
+import { botIdentities } from "./bot-identities.js";
 
 export interface Metadata {
   guildName: string;
@@ -53,15 +54,20 @@ export class DiscordDriver implements VoiceDriver {
       intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
     }),
   };
+  constructor(
+    private activeIds: readonly LaneId[] = ["A", "B"],
+    private group = "PulseMic",
+  ) {}
   private connections = new Map<LaneId, VoiceConnection>();
   private channels = new Map<LaneId, VoiceChannel>();
   private events?: DriverEvents;
   private config!: SavedSettings;
+  private closed = false;
   async initialize(settings: SavedSettings) {
     this.config = settings;
     try {
       await Promise.all(
-        (["A", "B"] as const).map(async (id) => {
+        this.activeIds.map(async (id) => {
           const client = this.clients[id];
           // Register before login: ready can happen before login's promise resolves.
           const ready = new Promise<void>((resolve, reject) => {
@@ -89,10 +95,12 @@ export class DiscordDriver implements VoiceDriver {
             }),
             ready,
           ]);
+          if (this.closed) throw new ControlError("Bot 驗證已取消，請重試。");
           this.identities[id] = {
             id: client.user!.id,
             name: client.user!.username,
           };
+          botIdentities.claim(client.user!.id, this.group, this);
           const guild = await client.guilds
             .fetch(settings.guildId)
             .catch(() => {
@@ -152,7 +160,10 @@ export class DiscordDriver implements VoiceDriver {
           client.on(Events.ShardReady, () => this.events?.online(id, true));
         }),
       );
-      if (this.identities.A.id === this.identities.B.id)
+      if (
+        this.activeIds.length > 1 &&
+        this.identities.A.id === this.identities.B.id
+      )
         throw new ControlError("請使用兩個不同 Discord Bot 身分的 Token。");
     } catch (error) {
       this.close();
@@ -173,7 +184,7 @@ export class DiscordDriver implements VoiceDriver {
         name: channel?.name ?? "",
       };
     }
-    for (const id of ["A", "B"] as const) {
+    for (const id of this.activeIds) {
       const channel = this.channels.get(id);
       if (channel && !guild.channels.cache.has(channel.id))
         this.events?.fault(id, "語音頻道已刪除，請重新設定 Channel ID。");
@@ -200,7 +211,7 @@ export class DiscordDriver implements VoiceDriver {
       guildId: guild.id,
       channelId: channel.id,
       adapterCreator: guild.voiceAdapterCreator,
-      group: `PulseMic-${id}`,
+      group: `${this.group}-${id}`,
       selfDeaf: false,
       selfMute: true,
     });
@@ -227,7 +238,11 @@ export class DiscordDriver implements VoiceDriver {
   }
   members(id: LaneId): Member[] {
     const channel = this.channels.get(id);
-    const botIds = new Set([this.identities.A.id, this.identities.B.id]);
+    const botIds = new Set([
+      ...botIdentities.ids(),
+      this.identities.A.id,
+      this.identities.B.id,
+    ]);
     return channel
       ? [...channel.members.values()]
           .filter((member) => !botIds.has(member.id))
@@ -276,7 +291,9 @@ export class DiscordDriver implements VoiceDriver {
     }
   }
   close() {
-    for (const id of ["A", "B"] as const) {
+    this.closed = true;
+    botIdentities.release(this);
+    for (const id of this.activeIds) {
       this.leave(id);
       this.clients[id].destroy();
     }

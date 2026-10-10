@@ -2,6 +2,21 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Access } from "../server/access.js";
 
+test("caster codes and stream grants cannot authorize player output", () => {
+  const access = new Access();
+  const caster = access.issueCode("caster");
+  assert.equal(access.redeem(caster.code, "players"), undefined);
+  const token = access.redeem(caster.code, "caster")!;
+  assert.ok(token);
+  assert.equal(access.claimOutput(token, "players"), false);
+  assert.equal(access.claimOutput(token, "caster"), true);
+  assert.equal(access.claimOutput(token, "caster"), false);
+  assert.equal(access.redeem(caster.code, "caster"), undefined);
+  const players = access.issueCode();
+  assert.equal(access.redeem(players.code, "caster"), undefined);
+  assert.ok(access.redeem(players.code));
+});
+
 test("output codes redeem once; grants claim one socket and revoke on exit", () => {
   const access = new Access();
   const { code } = access.issueCode();

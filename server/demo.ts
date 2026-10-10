@@ -13,6 +13,19 @@ export class DemoDriver implements VoiceDriver {
     A: { id: "demo-bot-a", name: "PulseMic A" },
     B: { id: "demo-bot-b", name: "PulseMic B" },
   };
+  constructor(caster = false) {
+    if (caster) {
+      this.metadata.channels.A = {
+        id: "demo-caster",
+        name: "主播台語音（示範）",
+      };
+      this.metadata.channels.B = this.metadata.channels.A;
+      this.identities.A = {
+        id: "demo-caster-bot",
+        name: "PulseMic Caster Desk",
+      };
+    }
+  }
   private sources = new Map<LaneId, SourceId>();
   private events?: DriverEvents;
   async initialize(_: SavedSettings) {}
@@ -29,14 +42,18 @@ export class DemoDriver implements VoiceDriver {
   members(id: LaneId): Member[] {
     const source = this.sources.get(id);
     return source
-      ? ["隊長", "選手 02", "選手 03", "選手 04", "隊長"].map(
-          (name, index) => ({
-            id: `demo-${source}-${index}`,
-            name,
-            avatar: "",
-            speaking: false,
-          }),
-        )
+      ? (this.identities.A.id === "demo-caster-bot"
+          ? ["主播", "賽評", "製播協調"]
+          : ["隊長", "選手 02", "選手 03", "選手 04", "隊長"]
+        ).map((name, index) => ({
+          id:
+            this.identities.A.id === "demo-caster-bot"
+              ? `demo-caster-${index}`
+              : `demo-${source}-${index}`,
+          name,
+          avatar: "",
+          speaking: false,
+        }))
       : [];
   }
   rename(source: SourceId, name: string) {

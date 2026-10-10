@@ -6,10 +6,10 @@ export const defaultMix = (): Mix => ({
   lanes: { A: { volume: 100, muted: false }, B: { volume: 100, muted: false } },
   members: {},
 });
-export function readMix(): Mix {
+export function readMix(key = "pulsemic.mix.v1"): Mix {
   const fallback = defaultMix();
   try {
-    const saved = JSON.parse(localStorage.getItem("pulsemic.mix.v1") ?? "null");
+    const saved = JSON.parse(localStorage.getItem(key) ?? "null");
     if (!saved || typeof saved !== "object") return fallback;
     const volume = (value: unknown, maximum: number) =>
       typeof value === "number" && Number.isFinite(value)

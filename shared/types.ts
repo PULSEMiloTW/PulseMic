@@ -1,4 +1,5 @@
 export const ids = ["A", "B"] as const;
+export type OutputKind = "players" | "caster";
 export type LaneId = (typeof ids)[number];
 export type SourceId = LaneId;
 export interface Member {
@@ -61,6 +62,9 @@ export interface TrackInfo {
 }
 export type ServerMessage =
   | { type: "mix"; mix: Mix }
+  | { type: "caster-state"; state: Snapshot }
+  | { type: "caster-mix"; mix: Mix }
+  | { type: "panic"; muted: boolean }
   | {
       type: "opus";
       lane: LaneId;
