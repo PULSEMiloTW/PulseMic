@@ -9,12 +9,12 @@ test("desktop console: explicit demo, independent source choices, duplicate hand
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/?tab=control");
+  await page.goto("/console");
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "連線設定", exact: true }).click();
+  await page.getByRole("link", { name: "專屬後台", exact: true }).click();
   await page.getByRole("button", { name: "進入示範模式" }).click();
-  await expect(page.locator(".lane-a .demo-tag")).toHaveText("示範音源");
   await page.getByRole("link", { name: "音控台", exact: true }).click();
+  await expect(page.locator(".lane-a .demo-tag")).toHaveText("示範音源");
   const laneA = page.locator(".lane-a").first();
   const laneB = page.locator(".lane-b").first();
   await laneA.getByRole("button", { name: "Channel B 琥珀隊選手語音" }).click();
@@ -119,7 +119,7 @@ test("narrow console has stacked lanes, keyboard focus and no horizontal overflo
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/?tab=listen");
+  await page.goto("/console");
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
   const laneA = page.locator(".lane-a").first();
   const laneB = page.locator(".lane-b").first();
@@ -178,7 +178,7 @@ test("long channel names wrap without overflow at 320px", async ({ page }) => {
     });
   });
   await page.setViewportSize({ width: 320, height: 800 });
-  await page.goto("/?tab=listen");
+  await page.goto("/console");
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
   await expect(
     page.locator(".lane-a").first().getByRole("heading", { name: longName }),
@@ -198,13 +198,13 @@ test("another controller takes over and old panel never shows stale listening ch
   page,
   context,
 }) => {
-  await page.goto("/?tab=listen");
+  await page.goto("/console");
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
   await expect(
     page.locator(".lane-a").first().getByText("正在收聽", { exact: true }),
   ).toBeVisible();
   const replacement = await context.newPage();
-  await replacement.goto("/?tab=listen");
+  await replacement.goto("/console");
   await expect(
     replacement.getByText("本機服務已連線", { exact: true }),
   ).toBeVisible();
@@ -227,7 +227,7 @@ test("settings stays local, has empty tokens and actual resolved names; no publi
   page,
   request,
 }) => {
-  await page.goto("/?tab=settings");
+  await page.goto("/admin");
   await expect(page.getByText("本機服務已連線", { exact: true })).toBeVisible();
   await expect(page.getByLabel("機器人 A Token", { exact: false })).toHaveValue(
     "",
@@ -237,8 +237,8 @@ test("settings stays local, has empty tokens and actual resolved names; no publi
   await page
     .getByLabel("伺服器 ID", { exact: true })
     .fill("123456789012345678");
-  await page.getByRole("link", { name: "音控台", exact: true }).click();
-  await page.getByRole("link", { name: "連線設定", exact: true }).click();
+  await page.locator("#settings summary").click();
+  await page.locator("#settings summary").click();
   await expect(page.getByLabel("伺服器 ID", { exact: true })).toHaveValue(
     "123456789012345678",
   );

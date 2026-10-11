@@ -1,3 +1,5 @@
+import { OAuthSettings, OperatorSettings, RuntimeLogs } from "./Management";
+import type { Identity } from "../shared/types";
 import {
   memo,
   useEffect,
@@ -24,15 +26,6 @@ import { readMix } from "./mix";
 import { OutputAccess } from "./OutputAccess";
 import { useControl } from "./useControl";
 
-type Tab = "listen" | "control" | "settings" | "caster";
-function readTab(): Tab {
-  if (location.pathname === "/output" || location.pathname === "/caster-output")
-    return "listen";
-  const tab = new URLSearchParams(location.search).get("tab");
-  return tab === "settings" || tab === "control" || tab === "caster"
-    ? tab
-    : "listen";
-}
 function Icon({
   name,
 }: {
@@ -517,7 +510,7 @@ function CasterSettings({
           placeholder={
             state.settings.tokensSaved.A
               ? "已加密保存；留空沿用"
-              : "僅在本機輸入"
+              : "輸入主播台 Bot Token"
           }
         />
         <button disabled={pending || lane.status === "listening"}>
@@ -781,7 +774,7 @@ function Settings({
                 void run(() => request("/api/validate", {}), "settings");
               }}
             >
-              重新驗證本機設定
+              重新驗證連線
             </button>
           </div>
           {dirty ? <p className="field-help">尚未保存</p> : null}
@@ -812,10 +805,27 @@ export function App({
 }: { outputToken?: string; outputKind?: OutputKind } = {}) {
   const output = Boolean(outputToken);
   const consolePage = !output;
-  const localHost =
-    location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  const admin = !output && location.pathname === "/admin";
+  const [identity, setIdentity] = useState<Identity>();
+  useEffect(() => {
+    if (output) return;
+    let active = true;
+    void fetch("/api/identity", { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((user) => {
+        if (active) setIdentity(user);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [output]);
+  const canConfigure = identity?.role === "owner";
   const [audio] = useState(() => new HeadphoneMixer());
-  const control = useControl(audio, outputToken, outputKind);
+  const control = useControl(audio, outputToken, outputKind, admin);
   const mixKey =
     outputKind === "caster" ? "pulsemic.caster.mix.v1" : "pulsemic.mix.v1";
   const { state, connected, error, setError, request, monitor } = control;
@@ -827,11 +837,6 @@ export function App({
     audio.updateMix(control.remoteMix);
     setMix(control.remoteMix);
   }, [audio, output, control.remoteMix]);
-  const [settingsOpen, setSettingsOpen] = useState(
-    () =>
-      ["settings", "caster"].includes(readTab()) ||
-      window.location.hash === "#settings",
-  );
   const [recentNotice, setRecentNotice] = useState("等待本機服務連線");
   useEffect(() => {
     if (state?.notice) setRecentNotice(state.notice);
@@ -938,23 +943,44 @@ export function App({
             />
           </a>
           <nav aria-label="控制台區域">
-            <a href="#main">
+            <a
+              href={admin ? "/console" : "#main"}
+              aria-current={admin ? undefined : "page"}
+            >
               <Icon name="headphones" />
               音控台
             </a>
-            <a href="#outputs">
+            <a href={admin ? "/console#outputs" : "#outputs"}>
               <Icon name="signal" />
-              輸出授權
+              輸出頁
             </a>
-            <a href="#settings" onClick={() => setSettingsOpen(true)}>
-              <Icon name="settings" />
-              連線設定
+            {canConfigure ? (
+              <a href="/admin" aria-current={admin ? "page" : undefined}>
+                <Icon name="settings" />
+                專屬後台
+              </a>
+            ) : null}
+            <a href="/status" target="_blank" rel="noopener noreferrer">
+              <Icon name="signal" />
+              系統狀態
+            </a>
+            <a href="#logs">
+              <Icon name="signal" />
+              運行日誌
             </a>
           </nav>
           <div className="sidebar-bottom">
-            <img src="/brand/PulseMic_Icon.png" width="42" height="42" alt="" />
-            <span>PulseMic</span>
-            {!localHost ? (
+            <img
+              src={identity?.avatar || "/brand/PulseMic_Icon.png"}
+              width="42"
+              height="42"
+              alt=""
+            />
+            <span>
+              {identity?.name || "驗證身分中"}
+              <small>{identity?.role === "owner" ? "擁有者" : "操作員"}</small>
+            </span>
+            {identity ? (
               <button
                 onClick={() =>
                   void fetch("/auth/logout", { method: "POST" }).then(() =>
@@ -983,31 +1009,34 @@ export function App({
               />
             </a>
           ) : (
-            <h1>語音控制台</h1>
+            <h1>{admin ? "專屬後台" : "語音控制台"}</h1>
           )}
           <span className={`status ${!connected ? "error" : ""}`}>
             {connected ? "本機服務已連線" : "本機服務未連線"}
           </span>
-          <button
-            className={`panic ${(output ? mix.muted : control.panicMuted) ? "active-danger" : ""}`}
-            aria-pressed={output ? mix.muted : control.panicMuted}
-            disabled={!connected || Boolean(pending.panic)}
-            onClick={() =>
-              output
-                ? updateMix({ ...mix, muted: !mix.muted })
-                : void run(
-                    () => request("/api/panic", { muted: !control.panicMuted }),
-                    "panic",
-                  )
-            }
-          >
-            <Icon name="mute" />
-            {(output ? mix.muted : control.panicMuted)
-              ? "全部已靜音 · 取消"
-              : output
-                ? "本頁靜音"
-                : "全部靜音"}
-          </button>
+          {!admin ? (
+            <button
+              className={`panic ${(output ? mix.muted : control.panicMuted) ? "active-danger" : ""}`}
+              aria-pressed={output ? mix.muted : control.panicMuted}
+              disabled={!connected || Boolean(pending.panic)}
+              onClick={() =>
+                output
+                  ? updateMix({ ...mix, muted: !mix.muted })
+                  : void run(
+                      () =>
+                        request("/api/panic", { muted: !control.panicMuted }),
+                      "panic",
+                    )
+              }
+            >
+              <Icon name="mute" />
+              {(output ? mix.muted : control.panicMuted)
+                ? "全部已靜音 · 取消"
+                : output
+                  ? "本頁靜音"
+                  : "全部靜音"}
+            </button>
+          ) : null}
         </header>
         <main id="main" className="desk-main">
           {output ? (
@@ -1050,157 +1079,174 @@ export function App({
             </div>
           ) : (
             <>
-              <div
-                className={`mixer-grid ${output && outputKind === "caster" ? "caster-output-grid" : ""}`}
-              >
-                {(output && outputKind === "caster"
-                  ? (["A"] as const)
-                  : ids
-                ).map((id) => (
-                  <LanePanel
-                    key={id}
-                    state={state}
-                    id={id}
-                    readOnly={output}
-                    caster={output && outputKind === "caster"}
-                    mix={mix}
-                    audio={audio}
-                    pending={
-                      output || !connected || globalBusy || Boolean(pending[id])
-                    }
-                    command={output ? () => {} : command}
-                    updateMix={updateMix}
-                    updateMember={updateMember}
-                  />
-                ))}
-                {!output ? (
-                  <CasterDesk
-                    state={control.casterState}
-                    connected={connected}
-                    remoteMix={control.remoteCasterMix}
-                    request={request}
-                  />
-                ) : null}
-              </div>
+              {!admin ? (
+                <div
+                  className={`mixer-grid ${output && outputKind === "caster" ? "caster-output-grid" : ""}`}
+                >
+                  {(output && outputKind === "caster"
+                    ? (["A"] as const)
+                    : ids
+                  ).map((id) => (
+                    <LanePanel
+                      key={id}
+                      state={state}
+                      id={id}
+                      readOnly={output}
+                      caster={output && outputKind === "caster"}
+                      mix={mix}
+                      audio={audio}
+                      pending={
+                        output ||
+                        !connected ||
+                        globalBusy ||
+                        Boolean(pending[id])
+                      }
+                      command={output ? () => {} : command}
+                      updateMix={updateMix}
+                      updateMember={updateMember}
+                    />
+                  ))}
+                  {!output ? (
+                    <CasterDesk
+                      state={control.casterState}
+                      connected={connected}
+                      remoteMix={control.remoteCasterMix}
+                      request={request}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
               {!output ? (
                 <>
-                  <section
-                    id="outputs"
-                    className="outputs-grid"
-                    aria-label="輸出授權"
-                  >
-                    <OutputAccess
-                      kind="players"
-                      connected={connected}
-                      request={request}
-                    />
-                    <OutputAccess
-                      kind="caster"
-                      connected={connected}
-                      request={request}
-                    />
-                  </section>
-                  <details
-                    id="settings"
-                    className="desk-settings"
-                    open={settingsOpen}
-                    onToggle={(event) =>
-                      setSettingsOpen(event.currentTarget.open)
-                    }
-                  >
-                    <summary>
-                      <Icon name="settings" />
-                      連線設定
-                    </summary>
-                    {localHost ? (
-                      <div className="connection-grid">
-                        <div>
-                          <Settings
-                            state={state}
-                            request={request}
-                            run={run}
-                            pending={!connected || globalBusy}
-                          />
-                          <div className="mode-actions">
-                            <button
-                              disabled={globalBusy || !connected}
-                              onClick={() => {
-                                setTone(false);
-                                audio.toggleTone(false);
-                                void run(
-                                  () =>
-                                    request("/api/mode", {
-                                      mode:
-                                        state.mode === "demo" ? "live" : "demo",
-                                    }),
-                                  "mode",
-                                );
-                              }}
-                            >
-                              {state.mode === "demo"
-                                ? "返回真實模式"
-                                : "進入示範模式"}
-                            </button>
+                  {!admin ? (
+                    <section
+                      id="outputs"
+                      className="outputs-grid"
+                      aria-label="輸出頁"
+                    >
+                      <OutputAccess
+                        kind="players"
+                        connected={connected}
+                        request={request}
+                      />
+                      <OutputAccess
+                        kind="caster"
+                        connected={connected}
+                        request={request}
+                      />
+                    </section>
+                  ) : null}
+                  {admin && canConfigure ? (
+                    <details
+                      id="settings"
+                      className="desk-settings"
+                      open={true}
+                    >
+                      <summary>
+                        <Icon name="settings" />
+                        連線設定
+                      </summary>
+                      {canConfigure ? (
+                        <div className="connection-grid">
+                          <div>
+                            <Settings
+                              state={state}
+                              request={request}
+                              run={run}
+                              pending={!connected || globalBusy}
+                            />
+                            <div className="mode-actions">
+                              <button
+                                disabled={globalBusy || !connected}
+                                onClick={() => {
+                                  setTone(false);
+                                  audio.toggleTone(false);
+                                  void run(
+                                    () =>
+                                      request("/api/mode", {
+                                        mode:
+                                          state.mode === "demo"
+                                            ? "live"
+                                            : "demo",
+                                      }),
+                                    "mode",
+                                  );
+                                }}
+                              >
+                                {state.mode === "demo"
+                                  ? "返回真實模式"
+                                  : "進入示範模式"}
+                              </button>
+                            </div>
                           </div>
+                          <CasterSettings
+                            state={control.casterState}
+                            connected={connected}
+                            request={request}
+                          />
                         </div>
-                        <CasterSettings
-                          state={control.casterState}
-                          connected={connected}
-                          request={request}
-                        />
-                      </div>
-                    ) : (
-                      <p className="local-settings-note">
-                        Bot 憑證請於 Windows 主機的本機控制台設定。
-                      </p>
-                    )}
-                  </details>
+                      ) : (
+                        <p className="local-settings-note">
+                          只有擁有者能修改連線設定。
+                        </p>
+                      )}
+                    </details>
+                  ) : null}
+                  {admin && canConfigure ? (
+                    <div className="admin-grid">
+                      <OperatorSettings request={request} />
+                      <OAuthSettings request={request} />
+                    </div>
+                  ) : null}
+                  <RuntimeLogs request={request} connected={connected} />
                 </>
               ) : null}
             </>
           )}
         </main>
-        <footer className="monitor-bar">
-          {output ? (
-            <>
-              <div className="monitor-title">
-                <Icon name="headphones" />
-                <div>
-                  <strong>
-                    {monitoring ? "耳機監聽中" : "耳機監聽已停止"}
-                  </strong>
-                  <span>{audioStatus}</span>
+        {!admin ? (
+          <footer className="monitor-bar">
+            {output ? (
+              <>
+                <div className="monitor-title">
+                  <Icon name="headphones" />
+                  <div>
+                    <strong>
+                      {monitoring ? "耳機監聽中" : "耳機監聽已停止"}
+                    </strong>
+                    <span>{audioStatus}</span>
+                  </div>
                 </div>
-              </div>
-              <button
-                className={monitoring ? "" : "primary"}
-                disabled={
-                  Boolean(pending.monitor) || (!connected && !monitoring)
-                }
-                onClick={() => void toggleMonitor()}
-              >
-                {pending.monitor
-                  ? "處理中…"
-                  : monitoring
-                    ? "停止監聽"
-                    : "開始監聽"}
-              </button>
-            </>
-          ) : null}
-          <div className="recent" aria-live="polite">
-            <span>最近操作</span>
-            <p>{recentNotice}</p>
-          </div>
-          <div className="master">
-            <strong>{consolePage ? "選手輸出總音量" : "耳機總音量"}</strong>
-            <Volume
-              max={100}
-              label="耳機總音量"
-              value={mix.master}
-              onChange={(master) => updateMix({ ...mix, master })}
-            />
-          </div>
-        </footer>
+                <button
+                  className={monitoring ? "" : "primary"}
+                  disabled={
+                    Boolean(pending.monitor) || (!connected && !monitoring)
+                  }
+                  onClick={() => void toggleMonitor()}
+                >
+                  {pending.monitor
+                    ? "處理中…"
+                    : monitoring
+                      ? "停止監聽"
+                      : "開始監聽"}
+                </button>
+              </>
+            ) : null}
+            <div className="recent" aria-live="polite">
+              <a href="#logs">運行日誌</a>
+              <p>{recentNotice}</p>
+            </div>
+            <div className="master">
+              <strong>{consolePage ? "選手輸出總音量" : "耳機總音量"}</strong>
+              <Volume
+                max={100}
+                label="耳機總音量"
+                value={mix.master}
+                onChange={(master) => updateMix({ ...mix, master })}
+              />
+            </div>
+          </footer>
+        ) : null}
       </div>
     </div>
   );

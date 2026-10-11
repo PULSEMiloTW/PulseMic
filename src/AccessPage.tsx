@@ -92,12 +92,16 @@ export function AccessPage() {
         alt="PulseMic"
       />
       <h1>
-        {caster ? "Caster Desk 主播台輸出" : output ? "音源輸出" : "導播登入"}
+        {caster
+          ? "Caster Desk 主播台輸出"
+          : output
+            ? "音源輸出"
+            : "PulseMic 登入"}
       </h1>
       <p>
         {output
           ? "輸入這個輸出頁專用的一次性授權碼，開啟本次音源輸出。"
-          : "以指定的 Discord 帳號登入，進入賽事語音控制台。"}
+          : "以指定的 Discord 帳號登入，進入專屬後台或賽事語音控制台。"}
       </p>
       {output ? (
         <form onSubmit={(event) => void redeem(event)}>
@@ -145,6 +149,7 @@ export function AccessPage() {
           ) : (
             <p role="status">Discord 登入尚待本機設定完成。</p>
           )}
+          <a href="/status">查看系統狀態</a>
           <a href="/output">前往選手音源輸出頁</a>
           <a href="/caster-output">前往主播台音源輸出頁</a>
         </>

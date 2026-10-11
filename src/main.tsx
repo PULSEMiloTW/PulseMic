@@ -7,12 +7,16 @@ import "@fontsource/barlow/700.css";
 import "./style.css";
 import "./desk.css";
 import { App } from "./App";
+import { StatusPage } from "./StatusPage";
 import { AccessPage } from "./AccessPage";
-const gated =
-  location.pathname === "/output" ||
-  location.pathname === "/caster-output" ||
-  (location.hostname === "mic.pulse-studio.live" &&
-    location.pathname !== "/console");
+const page =
+  location.pathname === "/status" ? (
+    <StatusPage />
+  ) : ["/console", "/admin"].includes(location.pathname) ? (
+    <App />
+  ) : (
+    <AccessPage />
+  );
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>{gated ? <AccessPage /> : <App />}</React.StrictMode>,
+  <React.StrictMode>{page}</React.StrictMode>,
 );

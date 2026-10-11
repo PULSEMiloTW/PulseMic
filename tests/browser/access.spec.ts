@@ -18,6 +18,7 @@ test("public APIs deny anonymous access even with the local session secret", asy
   const secret = (await (await request.get("/api/session")).json()).session;
   const headers = {
     Host: "mic.pulse-studio.live",
+    Cookie: "",
     "X-PulseMic-Session": secret,
     Origin: "https://mic.pulse-studio.live",
   };

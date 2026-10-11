@@ -23,6 +23,7 @@ export function useControl(
   audio: HeadphoneMixer,
   outputToken?: string,
   outputKind: OutputKind = "players",
+  admin = false,
 ) {
   const [state, setState] = useState<Snapshot>();
   const [panicMuted, setPanicMuted] = useState(false);
@@ -38,6 +39,47 @@ export function useControl(
   useEffect(() => {
     let disposed = false;
     let retry: ReturnType<typeof setTimeout>;
+    if (admin) {
+      let polling = false;
+      const refresh = async () => {
+        if (polling || disposed) return;
+        polling = true;
+        try {
+          const auth = await fetch("/api/session", { cache: "no-store" });
+          if (!auth.ok) throw new Error();
+          const body = await auth.json();
+          if (disposed) return;
+          session.current = body.session;
+          const headers = { "X-PulseMic-Session": body.session };
+          const responses = await Promise.all([
+            fetch("/api/state", { headers }),
+            fetch("/api/caster/state", { headers }),
+          ]);
+          if (responses.some((response) => !response.ok)) throw new Error();
+          const [players, caster] = await Promise.all(
+            responses.map((response) => response.json()),
+          );
+          if (disposed) return;
+          setState(players);
+          setCasterState(caster);
+          setConnected(true);
+          setError("");
+        } catch {
+          if (!disposed) {
+            setConnected(false);
+            setError("後台授權或連線失效，請重新登入。");
+          }
+        } finally {
+          polling = false;
+        }
+      };
+      void refresh();
+      const interval = setInterval(() => void refresh(), 2000);
+      return () => {
+        disposed = true;
+        clearInterval(interval);
+      };
+    }
     const connect = async () => {
       try {
         const body = outputToken
@@ -153,22 +195,28 @@ export function useControl(
       socket.current?.close();
       audio.reset();
     };
-  }, [audio, outputToken, outputKind]);
-  const request = useCallback(async (path: string, body: unknown) => {
-    if (socket.current?.readyState !== WebSocket.OPEN)
-      throw new Error("本機服務尚未連線，請等待恢復。");
-    const response = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-PulseMic-Session": session.current,
-      },
-      body: JSON.stringify(body),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error ?? "操作失敗，請重試。");
-    return result;
-  }, []);
+  }, [audio, outputToken, outputKind, admin]);
+  const request = useCallback(
+    async (path: string, body: unknown) => {
+      if (
+        !session.current ||
+        (!admin && socket.current?.readyState !== WebSocket.OPEN)
+      )
+        throw new Error("控制服務尚未連線，請等待恢復。");
+      const response = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-PulseMic-Session": session.current,
+        },
+        body: JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "操作失敗，請重試。");
+      return result;
+    },
+    [admin],
+  );
   const monitor = useCallback(
     async (enabled: boolean) => {
       if (enabled && socket.current?.readyState !== WebSocket.OPEN)

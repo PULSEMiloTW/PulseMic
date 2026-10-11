@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import type { OutputKind } from "../shared/types.js";
+import type { Identity, OutputKind } from "../shared/types.js";
 
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -11,6 +11,7 @@ type Grant = { expires: number; claimed: boolean; kind: OutputKind };
 export class Access {
   private codes = new Map<string, { expires: number; kind: OutputKind }>();
   private outputs = new Map<string, Grant>();
+  private profiles = new Map<string, Omit<Identity, "role">>();
   private controllers = new Map<string, number>();
   private states = new Map<string, number>();
   constructor(private now = Date.now) {}
@@ -18,6 +19,8 @@ export class Access {
     for (const map of [this.controllers, this.states])
       for (const [key, expires] of map)
         if (expires <= this.now()) map.delete(key);
+    for (const key of this.profiles.keys())
+      if (!this.controllers.has(key)) this.profiles.delete(key);
     for (const [key, code] of this.codes)
       if (code.expires <= this.now()) this.codes.delete(key);
     for (const [key, grant] of this.outputs)
@@ -71,18 +74,25 @@ export class Access {
     this.prune();
     return this.states.delete(digest(state));
   }
-  controller() {
+  controller(profile?: Omit<Identity, "role">) {
     this.prune();
     if (this.controllers.size >= 100) throw new Error("Too many sessions");
     const token = secret();
     this.controllers.set(digest(token), this.now() + 8 * 60 * 60_000);
+    if (profile) this.profiles.set(digest(token), profile);
     return token;
   }
   controllerValid(token: string) {
     this.prune();
     return this.controllers.has(digest(token));
   }
+  profile(token: string) {
+    return this.controllerValid(token)
+      ? this.profiles.get(digest(token))
+      : undefined;
+  }
   logout(token: string) {
+    this.profiles.delete(digest(token));
     this.controllers.delete(digest(token));
   }
 }

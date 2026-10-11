@@ -8,12 +8,12 @@ test("caster desk has a separate stream, scoped code, mixer and shared emergency
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/console?tab=caster");
+  await page.goto("/admin");
   await expect(
-    page.getByRole("heading", { name: "語音控制台", exact: true }),
+    page.getByRole("heading", { name: "專屬後台", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Caster Desk Bot Token")).toHaveValue("");
-  await expect(page.locator(".mixer-grid .lane")).toHaveCount(3);
+  await expect(page.locator(".mixer-grid .lane")).toHaveCount(0);
   await expect(page.getByLabel("機器人 A Token", { exact: false })).toHaveValue(
     "",
   );
@@ -33,6 +33,8 @@ test("caster desk has a separate stream, scoped code, mixer and shared emergency
   };
   await request.post("/api/caster/mode", { headers, data: { mode: "live" } });
   await page.getByRole("button", { name: "演練主播台介面" }).click();
+  await page.getByRole("link", { name: "音控台", exact: true }).click();
+  await expect(page.locator(".mixer-grid .lane")).toHaveCount(3);
   await page.getByRole("button", { name: "開啟主播台語音" }).click();
   await expect(
     page.getByText("正在切換至 主播台語音（示範）…", { exact: true }),

@@ -127,3 +127,30 @@ export function laneStatus(lane: Lane): string {
       return "已退出語音";
   }
 }
+
+export interface Identity {
+  id: string;
+  name: string;
+  avatar: string;
+  role: "owner" | "operator";
+}
+export interface LogEntry {
+  id: number;
+  time: number;
+  level: "info" | "warning";
+  message: string;
+}
+export interface StatusComponent {
+  id: string;
+  name: string;
+  status: "healthy" | "idle" | "unknown" | "degraded" | "demo";
+}
+export interface StatusReport {
+  updated: number;
+  started: number;
+  components: StatusComponent[];
+  history: { time: number; status: "healthy" | "unknown" | "degraded" }[];
+  requests: number;
+  failures: number;
+  lastLatency: number | null;
+}
