@@ -6,6 +6,7 @@ import "@fontsource/barlow/500.css";
 import "@fontsource/barlow/700.css";
 import "./style.css";
 import "./desk.css";
+import "./login.css";
 import { App } from "./App";
 import { StatusPage } from "./StatusPage";
 import { AccessPage } from "./AccessPage";

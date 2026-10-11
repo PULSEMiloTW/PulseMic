@@ -83,6 +83,42 @@ export function AccessPage() {
     return (
       <App outputToken={token} outputKind={caster ? "caster" : "players"} />
     );
+  if (!output)
+    return (
+      <main className="login-shell">
+        <section className="login-brand" aria-labelledby="brand-heading">
+          <img className="login-logo" src="/brand/PulseMic_MainLogo.png" alt="PulseMic" />
+          <div className="login-art" aria-hidden="true">
+            <div className="login-orbit" />
+            <img src="/brand/PulseMic_Icon.png" alt="" />
+            <span className="login-source source-a">選手語音 <b>A</b></span>
+            <span className="login-source source-b">選手語音 <b>B</b></span>
+            <span className="login-source source-c">主播台 <b>Caster Desk</b></span>
+          </div>
+          <div className="login-brand-copy">
+            <h1 id="brand-heading">每一道聲音，<br />都在你的掌握之中。</h1>
+            <p>為賽事導播打造的 Discord 語音監聽與獨立音源控制台。</p>
+          </div>
+        </section>
+        <section className="login-panel" aria-labelledby="login-heading">
+          <a className="login-status" href="/status">系統狀態</a>
+          <div className="login-content">
+            <h2 id="login-heading">進入你的導播台</h2>
+            <p className="login-intro">使用指定的 Discord 帳號登入，開始掌握賽事聲音。</p>
+            {ready ? <a className="login-discord" href="/auth/discord">使用 Discord 登入</a> : <p className="login-unavailable" role="status">Discord 登入尚待本機設定完成。</p>}
+            {error ? <p className="login-error" role="alert">{error}</p> : null}
+            <p className="login-permission">僅開放已指定人員。擁有者進入專屬後台，操作員進入控制台。</p>
+            <div className="login-divider"><span>音源輸出</span></div>
+            <nav className="login-outputs" aria-label="音源輸出入口">
+              <a href="/output">選手音源<span>Channel A / B</span></a>
+              <a href="/caster-output">主播台音源<span>Caster Desk</span></a>
+            </nav>
+            <p className="login-output-note">輸出頁使用一次性授權碼進入。</p>
+            <footer>PulseMic · Powered by Pulse Studio</footer>
+          </div>
+        </section>
+      </main>
+    );
   return (
     <main className="access-page">
       <img
