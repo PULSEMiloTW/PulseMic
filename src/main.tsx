@@ -10,6 +10,7 @@ import "./login.css";
 import { App } from "./App";
 import { StatusPage } from "./StatusPage";
 import { AccessPage } from "./AccessPage";
+document.title = location.pathname === "/status" ? "PulseMic Status" : "PulseMic";
 const page =
   location.pathname === "/status" ? (
     <StatusPage />

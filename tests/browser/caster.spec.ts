@@ -73,6 +73,7 @@ test("caster desk has a separate stream, scoped code, mixer and shared emergency
     };
   });
   await output.goto("/caster-output");
+  await output.getByRole("button", { name: "已有授權碼" }).click();
   await output.getByLabel("一次性授權碼").fill(code);
   await output.getByRole("button", { name: "驗證並進入" }).click();
   await expect(
@@ -138,6 +139,7 @@ test("caster desk has a separate stream, scoped code, mixer and shared emergency
     )
     .toBe(true);
   await output.reload();
+  await output.getByRole("button", { name: "已有授權碼" }).click();
   await expect(output.getByLabel("一次性授權碼")).toBeVisible();
   await page.getByRole("button", { name: "關閉主播台語音" }).click();
   await expect(

@@ -45,9 +45,12 @@ test("separate output page consumes code once and refresh requires a new code", 
     page.getByRole("button", { name: "開始監聽", exact: true }),
   ).toBeHidden();
   const output = await context.newPage();
+  output.on("pageerror", (error) => errors.push(error.message));
+  output.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   await output.goto("/output");
   await mkdir(".local/qa", { recursive: true });
-  await output.screenshot({ path: ".local/qa/output-login-desktop.png" });
+  await output.screenshot({ path: ".local/qa/output-login-desktop.png", fullPage: true });
+  await output.getByRole("button", { name: "已有授權碼" }).click();
   await output.getByLabel("一次性授權碼").fill(await issue(request));
   await output.getByRole("button", { name: "驗證並進入" }).click();
   await expect(
@@ -63,6 +66,7 @@ test("separate output page consumes code once and refresh requires a new code", 
     output.getByRole("button", { name: "停止監聽", exact: true }),
   ).toBeVisible();
   await output.reload();
+  await output.getByRole("button", { name: "已有授權碼" }).click();
   await expect(output.getByLabel("一次性授權碼")).toBeVisible();
   await expect(output.getByLabel("一次性授權碼")).toHaveValue("");
   await output.setViewportSize({ width: 390, height: 844 });
@@ -154,6 +158,7 @@ test("remote Opus transport decodes two independent member streams in Edge", asy
     socket.onClose(() => clearInterval(timer));
   });
   await page.goto("/output");
+  await page.getByRole("button", { name: "已有授權碼" }).click();
   await page.getByLabel("一次性授權碼").fill(await issue(request));
   await page.getByRole("button", { name: "驗證並進入" }).click();
   await expect(
@@ -273,13 +278,16 @@ test("output requests deliver only a reference to the browser and reject unsafe 
   request,
 }) => {
   await page.goto("/output");
+  await expect(page).toHaveTitle("PulseMic");
+  await expect(page.getByLabel("一次性授權碼")).toBeHidden();
   await page.getByLabel("要求者名稱").fill("輸出測試操作員");
   const responsePromise = page.waitForResponse("**/auth/output-request");
-  await page.getByRole("button", { name: "獲取授權碼", exact: true }).click();
+  await page.getByRole("button", { name: "授權加入", exact: true }).click();
   const response = await responsePromise;
   expect(response.status()).toBe(202);
   expect(Object.keys(await response.json())).toEqual(["requestId"]);
   await expect(page.getByRole("status")).toContainText("主機 CMD");
+  await expect(page.getByLabel("一次性授權碼")).toBeFocused();
   const data = { kind: "caster", requester: "test" };
   expect(
     (

@@ -63,3 +63,22 @@
   .login-discord:hover { transform: none; }
   .login-motion-toggle { display: none; }
 }
+
+.output-access-shell { min-height: 100svh; display: grid; place-items: center; padding: 40px 24px; background: radial-gradient(ellipse at 0 0, #123344 0, transparent 50%), radial-gradient(ellipse at 100% 100%, #302253 0, transparent 55%), #090b11; }
+.output-access-card { width: 100%; max-width: 480px; padding: 40px; border-radius: 20px; background: #f7f8fd; color: #18212b; color-scheme: light; box-shadow: 0 24px 64px #0004; }
+.output-access-logo { display: block; object-fit: contain; margin-bottom: 24px; }
+.output-access-card h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -.03em; }
+.output-access-card p { line-height: 1.8; color: #626b7c; overflow-wrap: anywhere; }
+.output-access-card .output-access-kind { margin: 0; color: #443b91; font-weight: 600; }
+.output-access-card form { display: grid; gap: 12px; margin-top: 24px; }
+.output-access-card label { font-size: 14px; font-weight: 600; }
+.output-access-card input { width: 100%; min-width: 0; min-height: 48px; padding: 12px; border: 1px solid #b9c1d1; border-radius: 10px; background: #fff; color: #18212b; }
+.output-access-card button.primary { justify-self: start; min-height: 48px; padding: 12px 20px; border: 0; border-radius: 10px; background: linear-gradient(110deg, #655cec, #8b55ee); color: #fff; font-weight: 600; cursor: pointer; }
+.output-access-card button:disabled { opacity: .55; cursor: default; }
+.output-access-card .output-access-notice { padding: 12px; border-radius: 10px; background: #ebe9ff; color: #443b91; }
+.output-access-existing { margin-top: 16px; min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: #5548b6; cursor: pointer; }
+.output-access-card .output-access-help { font-size: 13px; margin: 0; }
+.output-access-links { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; }
+.output-access-links a { min-height: 44px; display: inline-flex; align-items: center; color: #5548b6; font-size: 14px; }
+.output-access-card :is(input, button, a):focus-visible { outline: 3px solid #655cec; outline-offset: 4px; }
+@media (max-width: 480px) { .output-access-shell { padding: 24px 16px; } .output-access-card { padding: 28px 24px; } .output-access-logo { width: 112px; height: 112px; } }

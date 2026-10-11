@@ -4,6 +4,7 @@ import { App } from "./App";
 export function AccessPage() {
   const caster = location.pathname === "/caster-output";
   const output = location.pathname === "/output" || caster;
+  const [codeVisible, setCodeVisible] = useState(false);
   const [token, setToken] = useState("");
   const [requester, setRequester] = useState("");
   const [requestNotice, setRequestNotice] = useState("");
@@ -69,6 +70,7 @@ export function AccessPage() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "要求失敗，請重試。");
+      setCodeVisible(true);
       setRequestNotice(
         `要求編號 ${body.requestId}：授權碼已顯示於主機 CMD，請向主機操作員取得。`,
       );
@@ -124,81 +126,33 @@ export function AccessPage() {
       </main>
     );
   return (
-    <main className="access-page">
-      <img
-        src="/brand/PulseMic_MainLogo.png"
-        width="289"
-        height="96"
-        alt="PulseMic"
-      />
-      <h1>
-        {caster
-          ? "Caster Desk 主播台輸出"
-          : output
-            ? "音源輸出"
-            : "PulseMic 登入"}
-      </h1>
-      <p>
-        {output
-          ? "輸入這個輸出頁專用的一次性授權碼，開啟本次音源輸出。"
-          : "以指定的 Discord 帳號登入，進入專屬後台或賽事語音控制台。"}
-      </p>
-      {output ? (
-        <form onSubmit={(event) => void redeem(event)}>
+    <main className="output-access-shell">
+      <section className="output-access-card" aria-labelledby="output-access-heading">
+        <img className="output-access-logo" src="/brand/PulseMic_Icon.png" width="144" height="144" alt="PulseMic" />
+        <h1 id="output-access-heading">PulseMic</h1>
+        <p className="output-access-kind">{caster ? "Caster Desk 主播台輸出" : "選手音源輸出"}</p>
+        <p>請申請授權，並輸入由主機操作員提供的一次性授權碼，以開啟本次音源輸出。</p>
+        <form onSubmit={(event) => { event.preventDefault(); void requestCode(); }}>
           <label htmlFor="requester-name">要求者名稱</label>
-          <input
-            id="requester-name"
-            value={requester}
-            maxLength={80}
-            autoComplete="name"
-            onChange={(event) => setRequester(event.target.value)}
-          />
-          <button
-            type="button"
-            disabled={requestBusy || busy || !requester.trim()}
-            onClick={() => void requestCode()}
-          >
-            {requestBusy ? "要求中…" : "獲取授權碼"}
+          <input id="requester-name" value={requester} maxLength={80} autoComplete="name" required onChange={(event) => setRequester(event.target.value)} />
+          <button className="primary" disabled={requestBusy || busy || !requester.trim()}>
+            {requestBusy ? "申請中…" : "授權加入"}
           </button>
-          {requestNotice ? <p role="status">{requestNotice}</p> : null}
-          <label htmlFor="access-code">一次性授權碼</label>
-          <input
-            id="access-code"
-            name="code"
-            type="password"
-            autoComplete="off"
-            required
-            maxLength={100}
-            autoCapitalize="none"
-            spellCheck={false}
-          />
-          <button className="primary" disabled={busy}>
-            {busy ? "驗證中…" : "驗證並進入"}
-          </button>
-          <p>
-            一碼只能使用一次，有效期限 5
-            分鐘。重新整理或連線中斷後，請向導播取得新碼。單次播放最長 8 小時。
-          </p>
         </form>
-      ) : (
-        <>
-          {ready ? (
-            <a className="access-login" href="/auth/discord">
-              使用 Discord 登入
-            </a>
-          ) : (
-            <p role="status">Discord 登入尚待本機設定完成。</p>
-          )}
-          <a href="/status">查看系統狀態</a>
-          <a href="/output">前往選手音源輸出頁</a>
-          <a href="/caster-output">前往主播台音源輸出頁</a>
-        </>
-      )}
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+        {requestNotice ? <p className="output-access-notice" role="status">{requestNotice}</p> : null}
+        {!codeVisible ? (
+          <button className="output-access-existing" type="button" onClick={() => setCodeVisible(true)}>已有授權碼</button>
+        ) : (
+          <form onSubmit={(event) => void redeem(event)}>
+            <label htmlFor="access-code">一次性授權碼</label>
+            <input id="access-code" name="code" type="password" autoComplete="off" required maxLength={100} autoCapitalize="none" spellCheck={false} autoFocus />
+            <button className="primary" disabled={busy}>{busy ? "驗證中…" : "驗證並進入"}</button>
+            <p className="output-access-help">一碼只能使用一次，有效期限 5 分鐘。重新整理或連線中斷後，請向導播取得新碼。單次播放最長 8 小時。</p>
+          </form>
+        )}
+        {error ? <p className="login-error" role="alert">{error}</p> : null}
+        <nav className="output-access-links" aria-label="頁面導覽"><a href="/">返回登入頁</a><a href="/status">系統狀態</a></nav>
+      </section>
     </main>
   );
 }

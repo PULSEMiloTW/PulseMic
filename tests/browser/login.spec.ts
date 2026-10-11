@@ -19,6 +19,7 @@ test("PulseMic login preserves separate Discord and output entries across viewpo
   await page.goto("/?login=denied");
   await expect(page.getByRole("alert")).toContainText("未被指定");
   await page.goto("/caster-output");
+  await page.getByRole("button", { name: "已有授權碼" }).click();
   await expect(page.getByLabel("一次性授權碼")).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -51,4 +52,12 @@ test("login animation moves decoration, pauses without shifting layout, and resp
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(decoration).toBeHidden();
   await page.screenshot({ path: ".local/qa/login-motion-mobile.png", fullPage: true });
+});
+
+
+test("page titles use PulseMic branding", async ({ page }) => {
+  for (const route of ["/", "/console", "/admin", "/output", "/caster-output", "/status"]) {
+    await page.goto(route);
+    await expect(page).toHaveTitle(route === "/status" ? "PulseMic Status" : "PulseMic");
+  }
 });
