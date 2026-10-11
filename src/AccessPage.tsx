@@ -9,6 +9,7 @@ export function AccessPage() {
   const [requestNotice, setRequestNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [motionPaused, setMotionPaused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(() => {
     const result = new URLSearchParams(location.search).get("login");
@@ -85,9 +86,12 @@ export function AccessPage() {
     );
   if (!output)
     return (
-      <main className="login-shell">
+      <main className={`login-shell${motionPaused ? " login-motion-paused" : ""}`}>
         <section className="login-brand" aria-labelledby="brand-heading">
           <img className="login-logo" src="/brand/PulseMic_MainLogo.png" alt="PulseMic" />
+          <button className="login-motion-toggle" type="button" aria-pressed={motionPaused} onClick={() => setMotionPaused(paused => !paused)}>
+            {motionPaused ? "繼續動畫" : "暫停動畫"}
+          </button>
           <div className="login-art" aria-hidden="true">
             <div className="login-orbit" />
             <img src="/brand/PulseMic_Icon.png" alt="" />

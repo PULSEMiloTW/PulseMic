@@ -1,6 +1,6 @@
 # PulseMic
 
-已確認的必要產品需求集中於 [REQUIREMENTS.md](REQUIREMENTS.md)。登入首頁採 PulseVeto 左側品牌、右側登入的版型，內容與入口使用 PulseMic 的 Discord 授權及獨立音源流程。
+已確認的必要產品需求集中於 [REQUIREMENTS.md](REQUIREMENTS.md)。登入首頁採 PulseVeto 左側品牌、右側登入的版型，內容與入口使用 PulseMic 的 Discord 授權及獨立音源流程。桌面品牌圖示、光點與來源卡片緩慢浮動，可用「暫停動畫」停止；系統減少動畫設定停用進場及浮動，窄螢幕隱藏裝飾動畫。裝飾效果不代表 Bot 已連線或正在發言。
 
 供賽事導播使用的 **Windows 本機 Discord 選手雙機器人與主播台監聽系統**。兩個獨立 Bot 身分各自選擇 Channel A 或 B，另以第三個 **PulseMic Caster Desk** Bot 收取主播／賽評音源。每位成員保留獨立音源，在瀏覽器調整音量與靜音。
 

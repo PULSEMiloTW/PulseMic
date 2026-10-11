@@ -3,14 +3,15 @@
 .login-brand::before { content: ""; position: absolute; width: 700px; height: 700px; border: 100px solid #596bb20a; border-radius: 50%; left: 65%; top: -10%; pointer-events: none; }
 .login-logo { width: 240px; max-width: 70%; height: auto; position: relative; }
 .login-art { flex: 1; min-height: 320px; position: relative; display: grid; place-items: center; margin: 12px 0; }
-.login-art > img { width: min(56%, 300px); position: relative; filter: drop-shadow(0 12px 40px #59b5e822); }
-.login-orbit { position: absolute; width: 320px; max-width: 80%; aspect-ratio: 1; border: 1px solid #a5bcdf22; border-radius: 50%; }
+.login-art > img { width: min(56%, 300px); position: relative; filter: drop-shadow(0 12px 40px #59b5e822); animation: login-logo-float 6s ease-in-out infinite; }
+.login-orbit { position: absolute; width: 320px; max-width: 80%; aspect-ratio: 1; border: 1px solid #a5bcdf22; border-radius: 50%; animation: login-orbit-turn 18s linear infinite; }
+.login-orbit::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; left: 14%; top: 12%; background: #59b5e8; box-shadow: 0 0 18px #59b5e8; }
 .login-orbit::after { content: ""; position: absolute; inset: 32px; border: 1px dashed #a5bcdf22; border-radius: 50%; }
-.login-source { position: absolute; border: 1px solid #ffffff18; border-left: 3px solid var(--source); border-radius: 14px; background: #101827ec; padding: 13px 17px; font-size: 12px; color: var(--source); box-shadow: 0 12px 28px #0002; }
+.login-source { position: absolute; border: 1px solid #ffffff18; border-left: 3px solid var(--source); border-radius: 14px; background: #101827ec; padding: 13px 17px; font-size: 12px; color: var(--source); box-shadow: 0 12px 28px #0002; animation: login-source-float 5s ease-in-out infinite; }
 .login-source b { display: block; font-family: Barlow, sans-serif; color: #edf3f7; font-size: 24px; }
-.source-a { --source: #59b5e8; left: 8%; top: 18%; transform: rotate(-6deg); }
-.source-b { --source: #e8b35a; right: 4%; top: 38%; transform: rotate(5deg); }
-.source-c { --source: #b7a4ed; left: 15%; bottom: 8%; }
+.source-a { --source: #59b5e8; --tilt: -6deg; left: 8%; top: 18%; transform: rotate(var(--tilt)); }
+.source-b { --source: #e8b35a; --tilt: 5deg; right: 4%; top: 38%; transform: rotate(var(--tilt)); animation-delay: -1.7s; }
+.source-c { --source: #b7a4ed; --tilt: 0deg; left: 15%; bottom: 8%; animation-delay: -3.1s; }
 .source-c b { font-size: 19px; }
 .login-brand-copy { position: relative; }
 .login-brand-copy h1 { font-size: clamp(30px, 3.2vw, 48px); line-height: 1.3; letter-spacing: -.04em; margin: 0 0 20px; }
@@ -33,11 +34,22 @@
 .login-error { color: #a8273c; background: #fff0f2; padding: 12px; border-radius: 8px; line-height: 1.7; }
 .login-unavailable { padding: 16px; background: #f0f2f7; border-radius: 12px; line-height: 1.7; }
 .login-panel a:focus-visible { outline: 3px solid #5865df; outline-offset: 4px; }
+.login-logo, .login-brand-copy, .login-content { animation: login-enter .65s cubic-bezier(.22, 1, .36, 1) both; }
+.login-brand-copy { animation-delay: .1s; }
+.login-content { animation-delay: .16s; }
+.login-motion-toggle { position: absolute; right: 24px; top: 24px; z-index: 1; border: 1px solid #aeb6cb55; border-radius: 8px; padding: 8px 10px; background: #101827; color: #c8d1e0; font-size: 12px; cursor: pointer; }
+.login-motion-toggle:focus-visible { outline: 3px solid #59b5e8; outline-offset: 4px; }
+.login-motion-paused .login-art *, .login-motion-paused .login-art *::before, .login-motion-paused .login-art *::after { animation-play-state: paused; }
+@keyframes login-enter { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes login-logo-float { 50% { transform: translateY(-15px) rotate(1.5deg); } }
+@keyframes login-orbit-turn { to { transform: rotate(360deg); } }
+@keyframes login-source-float { 0%, 100% { transform: translateY(0) rotate(var(--tilt)); } 50% { transform: translateY(-14px) rotate(var(--tilt)); } }
 @media (max-width: 760px) {
   .login-shell { grid-template-columns: 1fr; }
   .login-brand { padding: 28px 24px 32px; }
   .login-logo { width: 190px; }
   .login-art { display: none; }
+  .login-motion-toggle { display: none; }
   .login-brand-copy { margin-top: 30px; }
   .login-brand-copy h1 { font-size: 30px; margin-bottom: 12px; }
   .login-brand-copy p { font-size: 13px; }
@@ -46,4 +58,8 @@
   .login-status { top: 24px; right: 24px; }
   .login-content footer { margin-top: 32px; }
 }
-@media (prefers-reduced-motion: reduce) { .login-discord { transition: none; } .login-discord:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .login-shell *, .login-shell *::before, .login-shell *::after { animation: none !important; transition: none !important; }
+  .login-discord:hover { transform: none; }
+  .login-motion-toggle { display: none; }
+}
