@@ -1026,3 +1026,85 @@
   border-radius: 8px;
   font: inherit;
 }
+/* Keep both connection forms on the same field and action rhythm. */
+.desk-app .caster-settings form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.desk-app .caster-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 12px;
+}
+.desk-app .settings-actions {
+  margin: 22px 0 0;
+  min-height: 44px;
+}
+.desk-app .caster-settings form button {
+  margin: 0;
+  width: 100%;
+}
+.desk-app .verified,
+.desk-app .caster-verified {
+  display: block;
+  min-height: 166px;
+}
+.desk-app .source-guild {
+  margin: 10px 0 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.desk-app .source-channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.desk-app .caster-verified .source-channels {
+  grid-template-columns: minmax(0, 1fr);
+}
+.desk-app .source-channel {
+  --source-accent: var(--blue);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--desk-line);
+  border-left: 3px solid var(--source-accent);
+  border-radius: 8px;
+  background: #07142340;
+}
+.desk-app .source-channel[data-source="B"] { --source-accent: #e9bc76; }
+.desk-app .source-channel[data-source="caster"] { --source-accent: #85d3c4; }
+.desk-app .source-marker {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #7187a118;
+  color: var(--source-accent);
+  font-size: 16px;
+  font-weight: 700;
+}
+.desk-app .source-channel > div { min-width: 0; }
+.desk-app .source-channel div > span { color: var(--muted); font-size: 11px; }
+.desk-app .source-channel b {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.desk-app .caster-mode {
+  border-top: 0;
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .desk-app .source-channels { grid-template-columns: minmax(0, 1fr); }
+  .desk-app .verified, .desk-app .caster-verified { min-height: 0; }
+}

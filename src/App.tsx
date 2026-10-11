@@ -479,49 +479,63 @@ function CasterSettings({
           });
         }}
       >
-        <label htmlFor="caster-guild">主播台伺服器 ID</label>
-        <input
-          id="caster-guild"
-          name="guildId"
-          defaultValue={state.settings.guildId}
-          required
-          pattern="[0-9]{17,20}"
-          inputMode="numeric"
-          autoComplete="off"
-        />
-        <label htmlFor="caster-channel">主播台語音頻道 ID</label>
-        <input
-          id="caster-channel"
-          name="channelId"
-          defaultValue={state.settings.channels.A}
-          required
-          pattern="[0-9]{17,20}"
-          inputMode="numeric"
-          autoComplete="off"
-        />
-        <label htmlFor="caster-token">Caster Desk Bot Token</label>
-        <input
-          id="caster-token"
-          name="token"
-          type="password"
-          maxLength={256}
-          autoComplete="off"
-          required={!state.settings.tokensSaved.A}
-          placeholder={
-            state.settings.tokensSaved.A
-              ? "已加密保存；留空沿用"
-              : "輸入主播台 Bot Token"
-          }
-        />
+        <label htmlFor="caster-guild">
+          主播台伺服器 ID
+          <input
+            id="caster-guild"
+            name="guildId"
+            defaultValue={state.settings.guildId}
+            required
+            pattern="[0-9]{17,20}"
+            inputMode="numeric"
+            autoComplete="off"
+          />
+        </label>
+        <label htmlFor="caster-channel">
+          主播台語音頻道 ID
+          <input
+            id="caster-channel"
+            name="channelId"
+            defaultValue={state.settings.channels.A}
+            required
+            pattern="[0-9]{17,20}"
+            inputMode="numeric"
+            autoComplete="off"
+          />
+        </label>
+        <label htmlFor="caster-token">
+          Caster Desk Bot Token
+          <input
+            id="caster-token"
+            name="token"
+            type="password"
+            maxLength={256}
+            autoComplete="off"
+            required={!state.settings.tokensSaved.A}
+            placeholder={
+              state.settings.tokensSaved.A
+                ? "已加密保存；留空沿用"
+                : "輸入主播台 Bot Token"
+            }
+          />
+        </label>
+        <div className="settings-actions">
         <button disabled={pending || lane.status === "listening"}>
           {busy ? "驗證中…" : "保存並驗證主播台"}
         </button>
+        </div>
       </form>
 
       {state.validated ? (
         <div className="caster-verified">
-          <strong>{state.guildName}</strong>
-          <span>{state.sources.A.name}</span>
+          <strong>{state.mode === "demo" ? "示範資料 · 未驗證真實 Discord" : "Discord 設定已驗證"}</strong>
+          <p className="source-guild">{state.guildName}</p>
+          <div className="source-channels">
+            <div className="source-channel" data-source="caster">
+              <span className="source-marker"><Icon name="headphones" /></span>
+              <div><span>主播台語音</span><b>{state.sources.A.name}</b></div>
+            </div>
+          </div>
         </div>
       ) : null}
       <div className="caster-mode">
@@ -788,13 +802,15 @@ function Settings({
               ? "Discord 設定已驗證"
               : "等待真實設定驗證"}
         </strong>
-        <p>{state.guildName ?? "尚未取得伺服器名稱"}</p>
+        <p className="source-guild">{state.guildName ?? "尚未取得伺服器名稱"}</p>
+        <div className="source-channels">
         {ids.map((id) => (
-          <p key={id}>
-            Channel {id}
-            <b>{state.sources[id].name || "尚未取得實際頻道名稱"}</b>
-          </p>
+          <div className="source-channel" data-source={id} key={id}>
+            <span className="source-marker">{id}</span>
+            <div><span>Channel {id}</span><b>{state.sources[id].name || "尚未取得實際頻道名稱"}</b></div>
+          </div>
         ))}
+        </div>
       </div>
     </div>
   );
