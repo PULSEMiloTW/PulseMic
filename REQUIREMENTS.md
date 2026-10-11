@@ -6,7 +6,7 @@
 
 - Windows 本機賽事導播 Discord 語音監聽；沿用 React／TypeScript／Vite 與 Node.js／TypeScript、discord.js、支援 DAVE 的語音架構，不以模擬介面取代真實系統。
 - 所有路徑依目前 checkout 解析；移轉電腦後重新輸入憑證，不沿用舊電腦的 DPAPI 加密檔。
-- 以可見 CMD 執行實際服務，提供一鍵啟動；localhost 服務經專用 Cloudflare Tunnel 發布至 `mic.pulse-studio.live`。
+- 以可見 CMD 執行實際服務，提供一鍵啟動服務與專用 Tunnel；各自檢查運行狀態，只啟動缺少的一個，兩者已運行時重用。localhost 服務經專用 Cloudflare Tunnel 發布至 `mic.pulse-studio.live`。
 - 不包含錄音、OBS 輸出、Discord 語音轉送或雲端主機部署。
 
 ## 身分與入口

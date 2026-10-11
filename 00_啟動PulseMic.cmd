@@ -7,9 +7,15 @@ pushd "%~dp0"
 if errorlevel 1 exit /b 1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-local.ps1" -PrepareOnly %*
 set "micPrepareResult=%errorlevel%"
+if /i "%~1"=="-CheckOnly" goto checktunnel
+if "%micPrepareResult%"=="0" goto tunnel
+if "%micPrepareResult%"=="3" goto tunnel
+goto failed
+:tunnel
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-tunnel.ps1" -EnsureRunning
+if errorlevel 1 goto failed
 if "%micPrepareResult%"=="3" goto running
 if not "%micPrepareResult%"=="0" goto failed
-if /i "%~1"=="-CheckOnly" goto done
 if not defined PULSEMIC_PORT set "PULSEMIC_PORT=3210"
 start "" "http://localhost:%PULSEMIC_PORT%/console"
 echo PulseMic CMD backend. Keep this window open. Ctrl+C stops the service.
@@ -20,6 +26,11 @@ goto done
 if not defined PULSEMIC_PORT set "PULSEMIC_PORT=3210"
 start "" "http://localhost:%PULSEMIC_PORT%/console"
 echo The existing backend remains in its original console.
+goto done
+:checktunnel
+if not "%micPrepareResult%"=="0" goto failed
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-tunnel.ps1" -CheckOnly
+if errorlevel 1 goto failed
 goto done
 :failed
 echo PulseMic startup failed. Check the messages above.

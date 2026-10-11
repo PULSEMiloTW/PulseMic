@@ -10,10 +10,10 @@
 
 需要 Windows 10/11、Node.js **22.12 以上**（建議 Node.js 24 LTS）、Edge 或 Chrome，以及可連接 Discord 的網路。
 
-1. 在目前專案資料夾雙擊 **`00_啟動PulseMic.cmd`**。
+1. 在目前專案資料夾雙擊 **`00_啟動PulseMic.cmd`**，同時檢查並啟動 PulseMic 與專用 Tunnel。兩者獨立判斷：已有服務或 Tunnel 時只啟動缺少的一個；兩者都有則只開啟控制台。不會停止其他專案的程序。專用 Tunnel 必須先完成 `.local/cloudflared.yml` 設定。
 2. 首次或套件 lockfile 更新後自動以 `npm ci` 安裝依賴；每次全新啟動會型別檢查並重新建置。
 3. 瀏覽器開啟 **http://localhost:3210/console**。保留服務視窗；按 Ctrl+C 停止服務，所有已設定 Bot 會登出。
-4. 若服務已啟動，再次點擊只開啟控制台。不同應用占用連接埠時不會終止該應用。
+4. 若服務與 Tunnel 都已啟動，再次點擊只開啟控制台。不同應用占用連接埠時不會終止該應用。服務與 Tunnel 使用各自的 CMD 視窗，請保持兩者開啟；授權碼顯示在服務 CMD。
 
 控制服務僅綁定 `127.0.0.1`，公網僅支援專用 Cloudflare Tunnel 的 `mic.pulse-studio.live`。公網控制台需 Discord 指定帳號登入，輸出頁需一次性授權碼。localhost 與公網控制台皆需 Discord 登入；本機登入會導向正式 HTTPS 網域，瀏覽器 Cookie 不跨主機分享。另一個控制台會接手；獨立輸出頁不會接管控制台。
 
@@ -50,7 +50,7 @@
 
 ### Cloudflare Tunnel
 
-本機使用專用 **PulseMic** Tunnel，設定在忽略於 Git 的 `.local/cloudflared.yml`，不修改其他產品的 Tunnel。先啟動 PulseMic，再雙擊 `02_啟動PulseMic網域.cmd`（或執行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tunnel.ps1`）；兩個服務視窗都需保持開啟。也可依下面範本在新的電腦重新建立專用 Tunnel；憑證不能提交 Git。
+本機使用專用 **PulseMic** Tunnel，設定在忽略於 Git 的 `.local/cloudflared.yml`，不修改其他產品的 Tunnel。平常雙擊 `00_啟動PulseMic.cmd` 即可檢查並啟動兩者。`02_啟動PulseMic網域.cmd`（或執行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tunnel.ps1`）仍可單獨啟動缺少的 Tunnel，已運行時不重複啟動；兩個服務視窗都需保持開啟。也可依下面範本在新的電腦重新建立專用 Tunnel；憑證不能提交 Git。
 
 ```yaml
 tunnel: YOUR_PULSEMIC_TUNNEL_UUID
