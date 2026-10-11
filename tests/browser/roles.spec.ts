@@ -53,6 +53,7 @@ test("owner backend, operator desk and anonymous status have distinct server per
   await expect(
     desk.getByRole("button", { name: "產生授權碼", exact: true }),
   ).toHaveCount(0);
+  await desk.getByRole("link", { name: "輸出頁", exact: true }).click();
   await expect(
     desk.getByRole("link", { name: "開啟選手雙路輸出 ↗", exact: true }),
   ).toHaveAttribute("target", "_blank");

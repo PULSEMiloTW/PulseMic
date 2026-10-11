@@ -822,6 +822,13 @@ export function App({
   const output = Boolean(outputToken);
   const consolePage = !output;
   const admin = !output && location.pathname === "/admin";
+  const [section, setSection] = useState(() => location.hash);
+  useEffect(() => {
+    const update = () => setSection(location.hash);
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
+  const deskPage = section === "#outputs" ? "outputs" : section === "#logs" ? "logs" : "mixer";
   const [identity, setIdentity] = useState<Identity>();
   useEffect(() => {
     if (output) return;
@@ -959,31 +966,23 @@ export function App({
             />
           </a>
           <nav aria-label="控制台區域">
-            <a
-              href={admin ? "/console" : "#main"}
-              aria-current={admin ? undefined : "page"}
-            >
-              <Icon name="headphones" />
-              音控台
+            <a href={admin ? "/console" : "#main"} aria-current={!admin && deskPage === "mixer" ? "page" : undefined}>
+              <Icon name="headphones" />音控台
             </a>
-            <a href={admin ? "/console#outputs" : "#outputs"}>
-              <Icon name="signal" />
-              輸出頁
+            <a href={admin ? "/console#outputs" : "#outputs"} aria-current={!admin && deskPage === "outputs" ? "page" : undefined}>
+              <Icon name="signal" />輸出頁
+            </a>
+            <a href={admin ? "/console#logs" : "#logs"} aria-current={!admin && deskPage === "logs" ? "page" : undefined}>
+              <Icon name="signal" />運行日誌
+            </a>
+            <a href="/status" target="_blank" rel="noopener noreferrer">
+              <Icon name="signal" />系統狀態
             </a>
             {canConfigure ? (
               <a href="/admin" aria-current={admin ? "page" : undefined}>
-                <Icon name="settings" />
-                專屬後台
+                <Icon name="settings" />專屬後台
               </a>
             ) : null}
-            <a href="/status" target="_blank" rel="noopener noreferrer">
-              <Icon name="signal" />
-              系統狀態
-            </a>
-            <a href="#logs">
-              <Icon name="signal" />
-              運行日誌
-            </a>
           </nav>
           <div className="sidebar-bottom">
             <img
@@ -1025,7 +1024,7 @@ export function App({
               />
             </a>
           ) : (
-            <h1>{admin ? "專屬後台" : "語音控制台"}</h1>
+            <h1>{admin ? "專屬後台" : deskPage === "outputs" ? "輸出頁" : deskPage === "logs" ? "運行日誌" : "語音控制台"}</h1>
           )}
           <span className={`status ${!connected ? "error" : ""}`}>
             {connected ? "本機服務已連線" : "本機服務未連線"}
@@ -1095,7 +1094,7 @@ export function App({
             </div>
           ) : (
             <>
-              {!admin ? (
+              {!admin && (output || deskPage === "mixer") ? (
                 <div
                   className={`mixer-grid ${output && outputKind === "caster" ? "caster-output-grid" : ""}`}
                 >
@@ -1134,7 +1133,7 @@ export function App({
               ) : null}
               {!output ? (
                 <>
-                  {!admin ? (
+                  {!admin && deskPage === "outputs" ? (
                     <section
                       id="outputs"
                       className="outputs-grid"
@@ -1214,13 +1213,15 @@ export function App({
                       <OAuthSettings request={request} />
                     </div>
                   ) : null}
-                  <RuntimeLogs request={request} connected={connected} />
+                  {!admin && deskPage === "logs" ? (
+                    <RuntimeLogs request={request} connected={connected} />
+                  ) : null}
                 </>
               ) : null}
             </>
           )}
         </main>
-        {!admin ? (
+        {!admin && (output || deskPage === "mixer") ? (
           <footer className="monitor-bar">
             {output ? (
               <>
@@ -1249,7 +1250,7 @@ export function App({
               </>
             ) : null}
             <div className="recent" aria-live="polite">
-              <a href="#logs">運行日誌</a>
+              <a href={output ? "/console#logs" : "#logs"}>運行日誌</a>
               <p>{recentNotice}</p>
             </div>
             <div className="master">
